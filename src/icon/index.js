@@ -1,0 +1,35 @@
+/**
+ * @file bdml's file's icon elements <icon>
+ * @author hzz780(huangzongzhe@baidu.com)
+ */
+import style from './index.css';
+
+export default {
+
+    behaviors: ['userTouchEvents', 'noNativeBehavior', 'hoverEffect', 'animateEffect'],
+    template: `<swan-icon
+            class="{{privateClass}}"
+        >
+            <span class="{{iconClass}} ${style['swan-icon']}" 
+            s-if="{{type != 'loadingWhite' && type != 'loadingGrey'}}" 
+            style="{{color ? 'color:' + color : ''}};{{size ? 'font-size:' + size + 'px': ''}}"></span>
+            <span class="{{iconClass}} ${style['swan-icon']}" 
+            s-if="{{type == 'loadingWhite' || type == 'loadingGrey'}}" 
+            style="width: {{size}}px;height: {{size}}px;"></span>
+        </swan-icon>`,
+    computed: {
+        iconClass() {
+            return style['swan-icon-' + this.data.get('type')];
+        }
+    },
+
+    initData() {
+        return {
+            privateClass: '',
+            hoverStopPropagation: false,
+            type: '',
+            size: 23,
+            color: ''
+        };
+    }
+};
