@@ -1,4 +1,12 @@
 /**
+* @license
+* Copyright Baidu Inc. All Rights Reserved.
+*
+* This source code is licensed under the Apache License, Version 2.0; found in the
+* LICENSE file in the root directory of this source tree.
+*/
+
+/**
  * @file communication for two 'webviews', this is a symmetric action
  * @author houyu(houyu01@baidu.com)
  */
