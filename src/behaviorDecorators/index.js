@@ -1,22 +1,16 @@
 /**
-* @license
-* Copyright Baidu Inc. All Rights Reserved.
-*
-* This source code is licensed under the Apache License, Version 2.0; found in the
-* LICENSE file in the root directory of this source tree.
-*/
-
-/**
  * @file swan component's decorator
  * @author houyu(houyu01@baidu.com)
  */
-import san from 'san';
 import {
     noop,
     computeDistance,
     attrValBool,
-    isEqualObject
+    isEqualObject,
+    hexColor,
+    getCoordinatePairFromMatrixStr
 } from '../utils';
+import {TOUCH_EVENTS_NAME} from '../utils/constant';
 import {animationEffect} from '../utils/animation';
 import {eventUtils, hasCustomEvent} from '../utils/event';
 // 长按时长
@@ -32,22 +26,26 @@ const eventExecCondition = function (e) {
     }
     return true;
 };
+// 键盘状态： 1 - 键盘弹起；0 - 键盘收起
+let KEYBOARD_STATUS = 0;
 const behaviorMap = {
+    keyboardStatus: {
+        methods: {
+            setKeyboardStatus(originMethod = noop, status) {
+                KEYBOARD_STATUS = status;
+                return originMethod.call(this, status);
+            }
+        }
+    },
     form: {
         methods: {
             attached(originMethod = noop, ...args) {
-                this.dispatch('form:register', {
-                    target: this,
-                    name: this.data.get('name')
-                });
+                this.registerFormItem();
                 return originMethod.call(this, ...args);
             },
 
             detached(originMethod = noop, ...args) {
-                this.dispatch('form:unregister', {
-                    target: this,
-                    name: this.data.get('name')
-                });
+                this.unRegisterFormItem();
                 return originMethod.call(this, ...args);
             },
 
@@ -63,6 +61,28 @@ const behaviorMap = {
                     return (this.el.value = null);
                 }
                 return originMethod.call(this);
+            },
+
+            registerFormItem(originMethod = noop, name = this.data.get('name')) {
+                this.dispatch('form:register', {
+                    target: this,
+                    name
+                });
+                return originMethod.call(this, name);
+            },
+
+            unRegisterFormItem(originMethod = noop, name = this.data.get('name')) {
+                this.dispatch('form:unregister', {
+                    target: this,
+                    name
+                });
+                return originMethod.call(this, name);
+            },
+
+            reRegisterFormItem(originMethod = noop, name = this.name || '') {
+                this.unRegisterFormItem(name);
+                this.registerFormItem();
+                return originMethod.call(this, name);
             }
         }
     },
@@ -70,6 +90,9 @@ const behaviorMap = {
     userTouchEvents: {
         methods: {
             onTouchEnd(originMethod = noop, $event, capture) {
+                // 组件的 touchend 事件会触发两次
+                this.__touchEndTimes = this.__touchEndTimes ? this.__touchEndTimes : 0;
+                this.__touchEndTimes++;
                 if (!eventExecCondition.call(this, $event)) {
                     return;
                 }
@@ -82,12 +105,19 @@ const behaviorMap = {
                     time: +new Date()
                 };
                 if (this.__touchesLength === 1
-                    && computeDistance(touchRelation.end, touchRelation.start) < TAP_DISTANCE_THRESHOLD) {
-                    if (touchRelation.end.time - touchRelation.start.time < LONG_PRESS_TIME_THRESHOLD) {
+                    && touchRelation.end.time - touchRelation.start.time < LONG_PRESS_TIME_THRESHOLD) {
+                        // 键盘弹起时，不校验 touchstart 与 touchend 之间的距离，防止 ios 端的 tap 事件无法触发
+                    if (computeDistance(touchRelation.end, touchRelation.start) < TAP_DISTANCE_THRESHOLD
+                        || !this.__computeDistanceWhenTap) {
+                        'function' === typeof this.onTap && this.onTap($event);
                         this.fire(prefix + 'bindtap', $event);
                     }
                 }
                 this.fire(prefix + 'bindtouchend', $event);
+                if (this.__touchEndTimes >= 2) {
+                    delete this.__touchEndTimes;
+                    this.__computeDistanceWhenTap = true;
+                }
                 return originMethod.call(this, $event, capture);
             },
 
@@ -104,6 +134,8 @@ const behaviorMap = {
                 if (!eventExecCondition.call(this, $event)) {
                     return;
                 }
+                // 键盘弹起时，不校验 touchstart 与 touchend 之间的距离，防止 ios 端的 tap 事件无法触发
+                this.__computeDistanceWhenTap = !KEYBOARD_STATUS;
                 this.__touchesLength = $event.touches.length;
                 const prefix = capture ? 'capture' : '';
                 this.touchRelation.start = {
@@ -128,6 +160,7 @@ const behaviorMap = {
                     else if (bindEvents.includes(prefix + 'bindlongtap')) {
                         this.fire(prefix + 'bindlongtap', this.$event);
                     }
+                    this.__computeDistanceWhenTap = true;
                 }, LONG_PRESS_TIME_THRESHOLD);
                 this.fire(prefix + 'bindtouchstart', $event);
                 return originMethod.call(this, $event, capture);
@@ -144,6 +177,7 @@ const behaviorMap = {
                     y: $event.changedTouches[0].screenY
                 };
                 if (computeDistance(touchRelation.move, touchRelation.start) > TAP_DISTANCE_THRESHOLD) {
+                    this.__computeDistanceWhenTap = true;
                     clearTimeout(this[`__${prefix}longpressTimer`]);
                 }
                 this.fire(prefix + 'bindtouchmove', $event);
@@ -153,7 +187,7 @@ const behaviorMap = {
             created(originMethod = noop, ...args) {
                 this.touchRelation = {};
                 if ((hasCustomEvent(this.listeners) || this.shouldBindEvents) && !this.eventsBinded) {
-                    this.nativeEvents = this.nativeEvents.concat(eventUtils.normalEvents);
+                    this.nativeEvents = this.nativeEvents.concat(eventUtils(this.san).normalEvents);
                     this.eventsBinded = true;
                 }
                 return originMethod.call(this, ...args);
@@ -172,19 +206,16 @@ const behaviorMap = {
             created(originMethod = noop, ...args) {
                 const hoverClass = this.data.get('hoverClass');
                 if (hoverClass && !this.eventsBinded) {
-                    this.nativeEvents = this.nativeEvents.concat(eventUtils.normalEvents);
+                    this.nativeEvents = this.nativeEvents.concat(eventUtils(this.san).normalEvents);
                     this.eventsBinded = true;
                 }
                 return originMethod.call(this, ...args);
             },
 
             onTouchStart(originMethod = noop, $event, capture) {
-                if (!eventExecCondition.call(this, $event)) {
-                    return;
-                }
                 if (!capture) {
                     this.hovering = true;
-                    if (!$event.stopHoverClass) {
+                    if (!$event.stopHoverClass && eventExecCondition.call(this, $event)) {
                         this.hoverStart($event);
                     }
                     if (attrValBool(this.data.get('hoverStopPropagation'))) {
@@ -278,7 +309,7 @@ const behaviorMap = {
             },
 
             compiled(originMethod = noop, ...args) {
-                this.nativeEvents = this.nativeEvents.concat(eventUtils.nativeBehaviorEvents);
+                this.nativeEvents = this.nativeEvents.concat(eventUtils(this.san).nativeBehaviorEvents);
                 return originMethod.call(this, ...args);
             }
         }
@@ -319,14 +350,12 @@ const behaviorMap = {
                     capture: {}
                 };
                 // 支持冒泡、捕获的事件
-                this.bubEventNames = ['bindtouchstart', 'bindtouchmove',
-                    'bindtouchend', 'bindtouchcancel', 'bindtap',
-                    'bindlongpress', 'bindlongtap', 'bindtouchforcechange'];
+                this.bubEventNames = TOUCH_EVENTS_NAME;
                 // 能终止tap事件冒泡、捕获的事件集合
                 this.stopTapTags = ['bindtouchstart', 'capturebindtouchstart'];
                 // 终止事件冒泡的NA组件集合
                 this.stopBubblingTags = ['SWAN-CANVAS', 'SWAN-VIDEO', 'SWAN-LIVE-PLAYER',
-                    'SWAN-CAMERA', 'SWAN-AR-CAMERA', 'SWAN-MAP'];
+                    'SWAN-CAMERA', 'SWAN-AR-CAMERA', 'SWAN-MAP', 'SWAN-BUTTON'];
                 // 没有手势事件的NA组件集合即不支持冒泡、捕获的组件(如：map组件的bindtap属于自定义事件)
                 this.noTouchEventTags = ['SWAN-MAP'];
                 this.noTouchEventTags.indexOf(this.el.tagName) === -1 && this.bindNaEvents();
@@ -428,6 +457,357 @@ const behaviorMap = {
                 } else { // 不需要冒泡的自定义事件
                     this.dispatchCustomEvent && this.dispatchCustomEvent(`bind${eventName}`, params);
                 }
+            }
+        }
+    },
+    nativeCover: {
+        methods: {
+            attached(originMethod = noop, ...args) {
+                this.__componentUpdatedHandler = message => {
+                    const component = message.data.component;
+                    // 不响应组件自身派发的 component:update
+                    component !== this && this.slaveUpdated();
+                };
+                // 响应 component:update, 触发 update 操作
+                this.communicator.onMessage('component:update', this.__componentUpdatedHandler);
+                return originMethod.call(this, ...args);
+            },
+
+            detached(originMethod = noop, ...args) {
+                this.communicator.delHandler('component:update', this.__componentUpdatedHandler);
+                delete this.__componentUpdatedHandler;
+                return originMethod.call(this, ...args);
+            },
+
+            /**
+             * 创建 NA 视图
+             * @param {Function} [originMethod] 原始方法
+             * @param {string} [name] 端能力名称，可选值为 coverview/coverimage
+             * @param {Object} [params] 端能力参数
+             * @return {Promise} 端能力执行结果
+             */
+            insertNativeCover(originMethod = noop, {
+                name = 'coverview',
+                params = {}
+            }) {
+                return new Promise((resolve, reject) => {
+                    this.boxjs.cover.insert({
+                        name: `swan-${name}`,
+                        data: params
+                    }).then(res => {
+                        resolve(res);
+                    }).catch(err => {
+                        console.warn('insertNativeCover::error:', err);
+                        reject(err);
+                    });
+                });
+            },
+
+            /**
+             * 更新 NA 视图
+             * @param {Function} [originMethod] 原始方法
+             * @param {string} [name] 端能力名称，可选值为 coverview/coverimage
+             * @param {Object} [params] 端能力参数
+             * @return {Promise} 端能力执行结果
+             */
+            updateNativeCover(originMethod = noop, {
+                name = 'coverview',
+                params = {}
+            }) {
+                return new Promise((resolve, reject) => {
+                    this.boxjs.cover.update({
+                        name: `swan-${name}`,
+                        data: params
+                    }).then(res => {
+                        resolve(res);
+                    }).catch(err => {
+                        console.warn('updateNativeCover::error:', err);
+                        reject(err);
+                    });
+                });
+            },
+
+            /**
+             * 删除 NA 视图
+             * @param {Function} [originMethod] 原始方法
+             * @param {string} [name] 端能力名称，可选值为 coverview/coverimage
+             * @param {Object} [params] 端能力参数
+             * @return {Promise} 端能力执行结果
+             */
+            removeNativeCover(originMethod = noop, {
+                name = 'coverview',
+                params = {}
+            }) {
+                return new Promise((resolve, reject) => {
+                    this.boxjs.cover.remove({
+                        name: `swan-${name}`,
+                        data: params
+                    }).then(res => {
+                        resolve(res);
+                    }).catch(err => {
+                        console.warn('removeNativeCover::error:', err);
+                        reject(err);
+                    });
+                });
+            },
+
+            /**
+             * 获得插入、更新 NA 视图所需的参数
+             * @param {Function} [originMethod] 原始方法
+             * @param {...Object} args 其它参数
+             * @return {Object} 通用参数集合
+             */
+            getParams(originMethod = noop, ...args) {
+                const hidden = this.data.get('hidden');
+                return {
+                    gesture: this.hasGestrue(),
+                    slaveId: `${this.slaveId}`,
+                    hide: `${attrValBool(hidden)}`,
+                    // [TODO] viewId 应该使用用户传入的 id
+                    viewId: `${this.id}`,
+                    sanId: `${this.id}`,
+                    parentId: this.getFirstParentComponentId(),
+                    position: this.getElementBox(),
+                    style: this.getStyle(),
+                    ...originMethod.call(this, ...args)
+                };
+            },
+
+            /**
+             * 获得插入、更新 NA 视图所需的 style 参数
+             * @param {Function} [originMethod] 原始方法
+             * @param {HTMLElement} [element] html 节点
+             * @return {Object} style 参数
+             */
+            getStyle(originMethod = noop, element = this.el) {
+                if (!element) {
+                    return {};
+                }
+                const {offsetWidth, offsetHeight} = element;
+                const computedStyle = global.getComputedStyle(element);
+                let {
+                    opacity = 1,
+                    paddingTop = 0,
+                    paddingRight = 0,
+                    paddingBottom = 0,
+                    paddingLeft = 0,
+                    borderTopWidth = 0,
+                    borderRightWidth = 0,
+                    borderBottomWidth = 0,
+                    borderLeftWidth = 0,
+                    borderRadius = 0,
+                    borderColor = '#f0ffffff',
+                    fontSize = 12,
+                    fontWeight = 'normal',
+                    textAlign,
+                    textOverflow,
+                    overflow,
+                    wordBreak,
+                    wordWrap,
+                    backgroundColor,
+                    color,
+                    lineHeight
+                } = computedStyle;
+
+                borderRadius = parseFloat(borderRadius);
+                fontSize = parseFloat(fontSize) || 12;
+
+                let cssStyleWhiteSpace = computedStyle.whiteSpace;
+                if (/%$/.test(computedStyle.borderRadius)) {
+                    const borderRadiusPercentage = borderRadius / 100;
+                    borderRadius = Math.min(
+                        Math.min(offsetWidth / 2, offsetWidth * borderRadiusPercentage),
+                        Math.min(offsetHeight / 2, offsetHeight * borderRadiusPercentage)
+                    );
+                } else if (this.swaninterface.boxjs.platform.isIOS()) {
+                    borderRadius = Math.min(offsetWidth / 2, offsetHeight / 2, borderRadius);
+                }
+
+                if ('start' === textAlign) {
+                    textAlign = 'left';
+                } else if ('end' === textAlign) {
+                    textAlign = 'right';
+                } else if (!['left', 'center', 'right'].includes(textAlign)) {
+                    textAlign = 'left';
+                }
+
+                if (isNaN(fontWeight)) {
+                    switch (fontWeight) {
+                        case 'bolder':
+                            fontWeight = 'bold';
+                            break;
+                        default:
+                            fontWeight = 'normal';
+                    }
+                } else if (fontWeight < 500) {
+                    fontWeight = 'normal';
+                } else if (fontWeight >= 500) {
+                    fontWeight = 'bold';
+                }
+                let lineBreak = 'break-word';
+                if ('visible' === overflow
+                    || 'nowrap' !== cssStyleWhiteSpace
+                    || 'ellipsis' !== textOverflow
+                    && 'clip' !== textOverflow) {
+                    if ('break-all' !== wordBreak && 'break-all' !== wordWrap) {
+                        lineBreak = 'break-all';
+                    }
+                } else {
+                    lineBreak = textOverflow;
+                }
+                let whiteSpace = 'nowrap';
+                if ('nowrap' !== cssStyleWhiteSpace) {
+                    whiteSpace = 'normal';
+                }
+                let fixed = computedStyle.position === 'fixed';
+                if (attrValBool(this.data.get('fixed'))) {
+                    fixed = true;
+                }
+                const overflowX = computedStyle.overflowX || 'visible';
+                const overflowY = computedStyle.overflowY || 'visible';
+                return {
+                    bgColor: hexColor(backgroundColor),
+                    borderRadius: `${borderRadius}`,
+                    borderWidth: `${parseFloat(borderTopWidth)}`,
+                    borderColor: hexColor(borderColor),
+                    padding: [
+                        `${parseFloat(paddingTop)}`,
+                        `${parseFloat(paddingRight)}`,
+                        `${parseFloat(paddingBottom)}`,
+                        `${parseFloat(paddingLeft)}`
+                    ],
+                    border: [
+                        `${parseFloat(borderTopWidth)}`,
+                        `${parseFloat(borderRightWidth)}`,
+                        `${parseFloat(borderBottomWidth)}`,
+                        `${parseFloat(borderLeftWidth)}`
+                    ],
+                    opacity: `${parseFloat(opacity)}`,
+                    color: hexColor(color),
+                    fontSize: `${fontSize}`,
+                    lineHeight: `${parseFloat(lineHeight) || 1.2 * fontSize}`,
+                    textAlign,
+                    fontWeight,
+                    lineBreak,
+                    whiteSpace,
+                    fixed,
+                    overflowX,
+                    overflowY
+                };
+            },
+
+            /**
+             * 获得插入、更新 NA 父视图所需的 style 参数
+             * @param {Function} [originMethod] 原始方法
+             * @param {HTMLElement} [element] html 节点
+             * @return {Object} style 参数
+             */
+            getParentComponentStyle(originMethod = noop, element = this.el) {
+                const parentComponent = this.parentComponent;
+                const defualtRes = {
+                    padding: [0, 0, 0, 0],
+                    border: [0, 0, 0, 0]
+                };
+                if (!this || !element
+                    || !parentComponent || !parentComponent.el
+                    || !parentComponent.isNativeComponent) {
+                    return defualtRes;
+                }
+                return parentComponent.isNativeComponent.call(parentComponent)
+                    ? this.getStyle.call(parentComponent)
+                    : defualtRes;
+            },
+
+            /**
+             * 获得组件 transform 偏移量
+             * @param {Function} [originMethod] 原始方法
+             * @param {HTMLElement} [element] html 节点
+             * @return {Object} 偏移量信息
+             */
+            getTranslate(originMethod = noop, element = this.el) {
+                if (!element) {
+                    return {x: 0, y: 0};
+                }
+                const computedStyle = global.getComputedStyle(element);
+                return {
+                    ...getCoordinatePairFromMatrixStr(computedStyle.transform || computedStyle.webkitTransform),
+                    ...originMethod.call(this)
+                };
+            },
+
+            /**
+             * 获得组件相对于整个 webview 的位置、宽高
+             * @param {Function} [originMethod] 原始方法
+             * @param {HTMLElement} [element] html 节点
+             * @return {Object} position 信息
+             */
+            getElementBox(originMethod = noop, element = this.el) {
+                if (!element) {
+                    return {};
+                }
+                const boundingClientRect = element.getBoundingClientRect();
+                const hasNativeParentComponent = this.hasNativeParentComponent();
+                const computedStyle = global.getComputedStyle(element);
+                let fixed = computedStyle.position === 'fixed';
+                if (attrValBool(this.data.get('fixed'))) {
+                    fixed = true;
+                }
+                const borderWidth = [
+                    parseFloat(computedStyle.getPropertyValue('border-top-width')),
+                    parseFloat(computedStyle.getPropertyValue('border-right-width')),
+                    parseFloat(computedStyle.getPropertyValue('border-bottom-width')),
+                    parseFloat(computedStyle.getPropertyValue('border-left-width'))
+                ];
+                const {
+                    padding = [0, 0, 0, 0],
+                    border = [0, 0, 0, 0]
+                } = this.getParentComponentStyle();
+                const translate = this.getTranslate();
+                const left = [
+                    fixed
+                        ? boundingClientRect.left
+                        : (hasNativeParentComponent
+                            ? element.offsetLeft
+                            : (boundingClientRect.left + global.scrollX)),
+                    borderWidth[3],
+                    fixed ? 0 : translate.x,
+                    fixed ? 0 : padding[3],
+                    fixed ? 0 : border[3]
+                ].reduce((a, b) => {
+                    return parseFloat(a) + parseFloat(b);
+                });
+                const top = [
+                    fixed
+                        ? boundingClientRect.top
+                        : (hasNativeParentComponent
+                            ? element.offsetTop
+                            : (boundingClientRect.top + global.scrollY)),
+                    borderWidth[0],
+                    fixed ? 0 : translate.y,
+                    fixed ? 0 : padding[0],
+                    fixed ? 0 : border[0]
+                ].reduce((a, b) => {
+                    return parseFloat(a) + parseFloat(b);
+                });
+                const width = element.offsetWidth - borderWidth[3] - borderWidth[1];
+                const height = element.offsetHeight - borderWidth[0] - borderWidth[2];
+                return {
+                    left: `${left}`,
+                    top: `${top}`,
+                    width: `${width < 0 ? 0 : width}`,
+                    height: `${height < 0 ? 0 : height}`
+                };
+            },
+
+            updateOtherComponents(originMethod = noop, ...args) {
+                // 通知其它组件需要进行 update 操作
+                this.communicator.fireMessage({
+                    type: 'component:update',
+                    data: {
+                        component: this
+                    }
+                });
+                return originMethod.call(this, ...args);
             }
         }
     }

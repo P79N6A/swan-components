@@ -1,12 +1,4 @@
 /**
-* @license
-* Copyright Baidu Inc. All Rights Reserved.
-*
-* This source code is licensed under the Apache License, Version 2.0; found in the
-* LICENSE file in the root directory of this source tree.
-*/
-
-/**
  * @file swan's file's base elements <movable-view>
  * @author jiamiao(jiamiao@baidu.com)
  */
@@ -28,7 +20,7 @@ export default {
         const scaleValue = this.data.get(`${privateKey}.scaleValue`);
         let maxTranslateX = this.areaPosition.width - width * scaleValue;
         let maxTranslateY = this.areaPosition.height - height * scaleValue;
-        const outOfBounds = attrValBool(this.data.get('outOfBounds'));
+        const outOfBounds = this.data.get('__outOfBounds');
         // area的宽高都比view大
         if (maxTranslateX >= 0 && maxTranslateY >= 0) {
             posX < this.diffX && (posX = outOfBounds && 1 === type

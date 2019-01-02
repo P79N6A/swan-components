@@ -1,21 +1,14 @@
 /**
-* @license
-* Copyright Baidu Inc. All Rights Reserved.
-*
-* This source code is licensed under the Apache License, Version 2.0; found in the
-* LICENSE file in the root directory of this source tree.
-*/
-
-/**
  * @file Page 类，在 Slave 中运行
  * @author houyu(houyu01@baidu.com)
  */
 import styles from './public/page.css';
-import {uiLocation} from './utils/dom/uiLocation';
 import {getSelectData} from './utils/dom/swanXml/parseDataUtil';
 import {eventProccesser, getValueSafety, EnviromentEvent} from './utils';
 import {accumulateDiff} from './utils/data-diff';
 import swanEvents from './utils/swan-events';
+import {addIntersectionObserver, removeIntersectionObserver} from './utils/dom/swanXml/intersection-listener';
+import {computeObserverIntersection} from './utils/dom/swanXml/intersection-calculator';
 export default {
 
     dependencies: ['swaninterface', 'communicator'],
@@ -64,47 +57,49 @@ export default {
         this.slavePageRendered();
     },
 
-    getFPTiming(timeGap) {
-        if ('performance' in global) {
-            let paintMetrics = performance.getEntriesByType('paint');
-            if (paintMetrics !== undefined && paintMetrics.length > 0) {
-                let fp = paintMetrics.filter(entry => entry.name === 'first-paint');
-                if (fp.length >= 1) {
-                    swanEvents('slave_fe_first_paint', {
-                        eventId: 'fe_first_paint',
-                        errorType: 'setTimeout',
-                        timeStamp: parseInt(timeGap + fp[0].startTime, 10)
-                    });
-                } else {
-                    swanEvents('slave_fe_first_paint', {
-                        eventId: 'nreach',
-                        errorType: 'fe_first_paint_error',
-                        timeStamp: Date.now()
-                    });
-                }
-            } else {
-                swanEvents('slave_fe_first_paint', {
-                    eventId: 'nreach',
-                    errorType: 'fe_first_paint_error',
-                    timeStamp: Date.now()
-                });
-            }
+    andrSendFP(fp, errorType = 'fe_first_paint_error') {
+        if (fp > 0) {
+            swanEvents('slaveFeFirstPaint', {
+                eventId: 'fe_first_paint',
+                errorType: errorType,
+                timeStamp: fp
+            });
         } else {
-            swanEvents('slave_fe_first_paint', {
+            swanEvents('slaveFeFirstPaint', {
                 eventId: 'nreach',
-                errorType: 'fe_first_paint_error',
+                errorType: errorType,
                 timeStamp: Date.now()
             });
         }
     },
+    getFPTiming(timeGap) {
+        let paintMetrics = performance.getEntriesByType('paint');
+        if (paintMetrics !== undefined && paintMetrics.length > 0) {
+            let fcp = paintMetrics.filter(entry => entry.name === 'first-contentful-paint');
+            if (fcp.length >= 1) {
+                let fpTimeStamp = parseInt(timeGap + fcp[0].startTime, 10);
+                this.andrSendFP(fpTimeStamp, 'paint_entry_get');
+            } else {
+                this.andrSendFP(-1, 'get_performance_paint_entry_empty');
+            }
+        } else {
+            this.andrSendFP(-1, 'get_performance_paint_entry_error');
+        }
+    },
     attached() {
-        swanEvents('slave_active_render_end', {
+
+        swanEvents('slaveActiveRenderEnd', {
             slaveId: this.slaveId
         });
+
         if (this.swaninterface.boxjs.platform.isAndroid()) {
+
             if ('performance' in global) {
-                let timeGap = Date.now() - global.performance.now();
+                // 如果能获取到timeOrigin，则使用timeOrigin，否则使用Date.now 和performance.now 之间的差值
+                let timeGap = global.performance.timeOrigin || Date.now() - global.performance.now();
+
                 if ('PerformanceObserver' in global) {
+                    // 如果有PerformanceObserver对象，则使用PerformanceOvbserver来监听
                     let observerPromise = new Promise((resolve, reject) => {
                         let observer = new global.PerformanceObserver(list => {
                             resolve(list);
@@ -113,34 +108,32 @@ export default {
                             entryTypes: ['paint']
                         });
                     }).then(list => {
-                        let fp = list.getEntries().filter(entry => entry.name === 'first-paint');
-                        if (fp.length >= 1) {
-                            swanEvents('slave_fe_first_paint', {
-                                eventId: 'fe_first_paint',
-                                errorType: 'observer',
-                                timeStamp: parseInt(timeGap + fp[0].startTime, 10)
-                            });
+                        // 获取和首屏渲染相关的所有点，first-contentful-paint
+                        let fcp = list.getEntries().filter(entry => entry.name === 'first-contentful-paint');
+                        if (fcp.length >= 1) {
+                            // 如果有first-paint点，取first-contentful-paint
+                            let fpTimeStamp = parseInt(timeGap + fcp[0].startTime, 10);
+                            this.andrSendFP(fpTimeStamp, 'observer_get_fp');
                         } else {
-                            setTimeout(() => {
-                                this.getFPTiming(timeGap);
-                            }, 3000);
+                            // 如果从Observer取不到任何有意义的first render点，从performance.getEntries('paint')获取前端渲染点
+                            this.getFPTiming(timeGap);
                         }
                     }).catch(error => {
-                        setTimeout(() => {
-                            this.getFPTiming(timeGap);
-                        }, 0);
+                        // 如果从resolve发生错误，从performance.getEntries('paint')获取前端渲染点
+                        this.getFPTiming(timeGap);
                     });
                 } else {
+                    // 如果没有PerformanceObserver对象，延迟去2900ms从performance.getEntries('paint')获取前端渲染点
                     setTimeout(() => {
                         this.getFPTiming(timeGap);
-                    }, 3000);
+                    }, 2900);
                 }
             } else {
-                setTimeout(() => {
-                    this.getFPTiming();
-                }, 3000);
+                // 如果没有performance api，则表明前端取不到first render点，直接发送670性能点
+                this.andrSendFP(-1, 'fe_no_performance_api');
             }
         }
+
         this.slavePageRendered();
         this.sendAbilityMessage('rendered', this.masterNoticeComponents);
         this.sendAbilityMessage('nextTickReach');
@@ -161,8 +154,8 @@ export default {
             this.masterNoticeComponents.push(componentInfo);
         },
 
-        slavePageRendered() {
-            this.slavePageRendered();
+        customComponentInnerUpdated() {
+            this.updated();
         }
     },
 
@@ -243,7 +236,8 @@ export default {
 	 */
     slaveJsLog() {
     },
-
+    // TODO 兼容onReachBottom上拉触底触发两次的bug
+    enviromentBinded: false,
     /**
      *
      * 设置 page 的初始化数据
@@ -252,11 +246,18 @@ export default {
      * @param {string} Data.value   data 初始值，会通过 this.data.set 设置到当前 Page 对象
      * @param {string} Data.appConfig app.json中的内容
      */
-    setInitData({value, appConfig}) {
+    setInitData(params) {
+        // 如果fireMessage比onMessage先，在onMessage时会把消息队列里的整个数组丢过来
+        // 现在首屏，会执行两次initData的fireMessage，顺序为fire => on => fire
+        params = Object.prototype.toString.call(params) === '[object Array]' ? params[0] : params;
+        let {value, appConfig} = params;
         for (let k in value) {
             this.data.set(k, value[k]);
         }
-        this.initPageEnviromentEvent(appConfig);
+        if (!this.enviromentBinded) {
+            this.enviromentBinded = true;
+            this.initPageEnviromentEvent(appConfig);
+        }
     },
 
     /**
@@ -303,10 +304,6 @@ export default {
             }
         );
 
-        this.communicator.onMessage('postScrollToMessage', params => {
-            uiLocation().pageScrollTo(params.value || {});
-        });
-
         this.communicator.onMessage('querySlaveSelector', params => {
             const {selector, queryType, index, operation, fields, execId, contextId} = params.value;
             const data = getSelectData({selector, queryType, operation, fields, contextId});
@@ -325,6 +322,8 @@ export default {
             );
         });
 
+        this.onRequestComponentObserver();
+
         // 客户端向slave派发事件
         this.communicator.onMessage('abilityMessage', e => {
             this.communicator.fireMessage({
@@ -333,8 +332,50 @@ export default {
             });
         });
 
+        // 客户端向slave派发双击标题栏事件
+        this.communicator.onMessage('scrollViewBackToTop', e => {
+            this.communicator.fireMessage({
+                type: 'scrollView-backTotop'
+            });
+        });
+
         this.swaninterface.bind('PullDownRefresh', e => {
-            this.sendAbilityMessage('pullDownRefresh', e);
+            // 参数 e 中包含 element 信息，导致部分 Android 机型使用系统内核时消息传递失败，因此只传 e.type
+            this.sendAbilityMessage('pullDownRefresh', {
+                type: e.type
+            });
+        });
+    },
+
+    /**
+     * 监听 requestComponentObserver 事件
+     *
+     * @return {undefined}
+     */
+    onRequestComponentObserver() {
+        let self = this;
+        let observerMap = {};
+
+        window.addEventListener('scroll', () => {
+            requestAnimationFrame(function () {
+                for (let observerId in observerMap) {
+                    computeObserverIntersection(observerMap[observerId]);
+                }
+            });
+        }, {
+            capture: true,
+            passive: true
+        });
+
+        this.communicator.onMessage('requestComponentObserver', params => {
+            switch (params.operationType) {
+                case 'add':
+                    addIntersectionObserver(params, self.communicator, observerMap);
+                    break;
+                case 'remove':
+                    removeIntersectionObserver(params, self.communicator, observerMap);
+                    break;
+            }
         });
     },
 

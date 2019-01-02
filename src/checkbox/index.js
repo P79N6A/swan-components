@@ -1,18 +1,10 @@
 /**
-* @license
-* Copyright Baidu Inc. All Rights Reserved.
-*
-* This source code is licensed under the Apache License, Version 2.0; found in the
-* LICENSE file in the root directory of this source tree.
-*/
-
-/**
  * @file bdml's file's base elements <checkbox>
  * @author lijiahui(lijiahui02@baidu.com)
  *
  */
 import style from './index.css';
-import {attrValBool} from '../utils';
+import {internalDataComputedCreator, typesCast} from '../computedCreator';
 
 export default {
 
@@ -30,16 +22,22 @@ export default {
 
     computed: {
         setUserColor() {
-            return attrValBool(this.data.get('checked'))
-                ? `background-color: ${this.data.get('color')};` : '';
-        }
+            return this.data.get('__checked')
+                ? `background-color: ${this.data.get('__color')};` : '';
+        },
+        ...internalDataComputedCreator([
+            {name: 'privateClass', caster: typesCast.stringCast},
+            {name: 'checked', caster: typesCast.boolCast},
+            {name: 'disabled', caster: typesCast.boolCast},
+            {name: 'color', caster: typesCast.stringCast, default: '#3c76ff'}
+        ])
     },
 
     template: `<swan-checkbox
-        class="{{privateClass}}"
+        class="{{__privateClass}}"
         value="{{value}}"
-        checked="{{checked}}"
-        disabled="{{disabled}}"
+        checked="{{__checked}}"
+        disabled="{{__disabled}}"
         on-click="onClick($event)"
     >
         <div class="{{'${style['swan-checkbox-input']}'}}"
@@ -51,7 +49,7 @@ export default {
     attached() {
         this.dispatch('checkbox-item-init', {
             item: this,
-            checked: this.data.get('checked'),
+            checked: this.data.get('__checked'),
             value: this.data.get('value')
         });
         // 配合 label
@@ -77,7 +75,7 @@ export default {
      */
     updated() {
         this.dispatch('checkbox-item-change', {
-            checked: this.data.get('checked'),
+            checked: this.data.get('__checked'),
             value: this.data.get('value')
         });
     },
@@ -88,9 +86,9 @@ export default {
      * @param {Event} $event 事件对象
      */
     onClick($event) {
-        if (attrValBool(this.data.get('disabled'))) {
+        if (this.data.get('__disabled')) {
             return;
         }
-        this.data.set('checked', !attrValBool(this.data.get('checked')));
+        this.data.set('checked', !this.data.get('__checked'));
     }
 };

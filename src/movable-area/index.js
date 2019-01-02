@@ -1,17 +1,10 @@
 /**
-* @license
-* Copyright Baidu Inc. All Rights Reserved.
-*
-* This source code is licensed under the Apache License, Version 2.0; found in the
-* LICENSE file in the root directory of this source tree.
-*/
-
-/**
  * @file swan's file's base elements <movable-are>
  * @author lvlei(lvlei03@baidu.com)
  */
 import style from './index.css';
-import {attrValBool, computeDistance} from '../utils';
+import {computeDistance} from '../utils';
+import {internalDataComputedCreator, typesCast} from '../computedCreator';
 
 export default {
 
@@ -27,10 +20,16 @@ export default {
         };
     },
 
+    computed: {
+        ...internalDataComputedCreator([
+            {name: 'scaleArea', caster: typesCast.boolCast}
+        ])
+    },
+
     template: `<swan-movable-area
-        on-touchstart="onTouchStart($event)"
-        on-touchmove="onTouchMove($event)"
-        on-touchend="onTouchEnd($event)">
+        on-touchstart="onMovableAreaTouchStart($event)"
+        on-touchmove="onMovableAreaTouchMove($event)"
+        on-touchend="onMovableAreaTouchEnd($event)">
         <slot></slot>
     </swan-movable-area>`,
 
@@ -63,16 +62,16 @@ export default {
      * 鼠标开始触碰触发的事件
      * @param {Object} [e] 鼠标event对象
      */
-    onTouchStart(e) {
-        this.preventEvents(e);
+    onMovableAreaTouchStart(e) {
+        // this.preventEvents(e);
     },
 
     /**
      * 移动时触发的事件
      * @param {Object} [e] 鼠标event对象
      */
-    onTouchMove(e) {
-        attrValBool(this.data.get('scaleArea')) && this.preventEvents(e);
+    onMovableAreaTouchMove(e) {
+        this.data.get('__scaleArea') && this.preventEvents(e);
         this.doubleFingerOperation(e);
     },
 
@@ -80,7 +79,7 @@ export default {
      * 鼠标结束触碰触发的事件，重置标识是否为缩放中的值
      * @param {Object} [e] 鼠标event对象
      */
-    onTouchEnd(e) {
+    onMovableAreaTouchEnd(e) {
         this.preventEvents(e);
         this.isAreaDoublePointScaling = false;
     },
@@ -90,7 +89,7 @@ export default {
      * @param {Object} [e] 鼠标event对象
      */
     doubleFingerOperation(e) {
-        if (e.changedTouches.length >= 2 && attrValBool(this.data.get('scaleArea'))) {
+        if (e.changedTouches.length >= 2 && this.data.get('__scaleArea')) {
             const startInfo0 = e.changedTouches[0];
             const startInfo1 = e.changedTouches[1];
             // 缓存第一次双指触屏两指的距离

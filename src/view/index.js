@@ -1,21 +1,13 @@
 /**
-* @license
-* Copyright Baidu Inc. All Rights Reserved.
-*
-* This source code is licensed under the Apache License, Version 2.0; found in the
-* LICENSE file in the root directory of this source tree.
-*/
-
-/**
  * @file bdml's file's base elements <view>
- * @author houyu(houyu01@baidu.com)
+ * @author zengqingzhuang(zengqingzhuang@baidu.com)
  */
-
+import {internalDataComputedCreator, typesCast} from '../computedCreator';
 export default {
 
     superComponent: 'swan-component',
 
-    template: `<swan-view class="{{privateClass}}">
+    template: `<swan-view class="{{__privateClass}}">
         <slot></slot>
     </swan-view>`,
 
@@ -28,5 +20,14 @@ export default {
             hoverStayTime: 400,
             hoverStopPropagation: false
         };
+    },
+
+    computed: {
+        ...internalDataComputedCreator([
+            {name: 'privateClass', caster: typesCast.stringCast},
+            {name: 'hoverStopPropagation', caster: typesCast.boolCast},
+            {name: 'hoverStartTime', caster: typesCast.numCast, default: 50},
+            {name: 'hoverStayTime', caster: typesCast.numCast, default: 400}
+        ])
     }
 };

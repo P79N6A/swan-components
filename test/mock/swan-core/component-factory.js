@@ -1,12 +1,4 @@
 /**
-* @license
-* Copyright Baidu Inc. All Rights Reserved.
-*
-* This source code is licensed under the Apache License, Version 2.0; found in the
-* LICENSE file in the root directory of this source tree.
-*/
-
-/**
  * @file 小程序定义组件的入口
  * @author houyu(houyu01@baidu.com)
  */
@@ -118,9 +110,10 @@ export default class SanFactory {
             .reduce((mergedClassProto, propName) => {
                 switch (propName) {
                     case 'constructor':
-                        mergedClassProto['constructor'] = function (options) {
-                            targetProto.constructor && targetProto.constructor.call(this, options);
-                            mergeProto.constructor && mergeProto.constructor.call(this, options);
+                    case 'created':
+                        mergedClassProto[propName] = function (options) {
+                            targetProto[propName] && targetProto[propName].call(this, options);
+                            mergeProto[propName] && mergeProto[propName].call(this, options);
                         };
                         break;
                     case 'computed':
@@ -129,6 +122,12 @@ export default class SanFactory {
                                 mergedClassProto[propName],
                                 mergeProto[propName]
                             );
+                        break;
+                    case 'created':
+                        mergedClassProto['created'] = function (options) {
+                            targetProto.created && targetProto.created.call(this, options);
+                            mergeProto.created && mergeProto.created.call(this, options);
+                        };
                         break;
                     case 'dependencies':
                         mergedClassProto[propName] = (mergeProto[propName] || []).reduce((r, v, k) => {

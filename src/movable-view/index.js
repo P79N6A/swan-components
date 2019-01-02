@@ -1,27 +1,20 @@
 /**
-* @license
-* Copyright Baidu Inc. All Rights Reserved.
-*
-* This source code is licensed under the Apache License, Version 2.0; found in the
-* LICENSE file in the root directory of this source tree.
-*/
-
-/**
  * @file swan's file's base elements <movable-view>
  * @author jiamiao(jiamiao@baidu.com)
  */
 import style from './index.css';
-import {attrValBool, computeDistance, privateKey} from '../utils';
+import {computeDistance, privateKey} from '../utils';
 import {getElementBox} from '../utils/dom';
 import computedMethod from './computedMethod';
+import {internalDataComputedCreator, typesCast} from '../computedCreator';
 
 export default {
     behaviors: ['userTouchEvents', 'noNativeBehavior', 'animateEffect'],
 
     template: `<swan-movable-view
-        on-touchstart="onTouchStart($event)"
-        on-touchmove="onTouchMove($event)"
-        on-touchend="onTouchEnd($event)"
+        on-touchstart="onMovableViewTouchStart($event)"
+        on-touchmove="onMovableViewTouchMove($event)"
+        on-touchend="onMovableViewTouchEnd($event)"
         style="transform-origin: center center 0px;
             transform: translateX({{privateData.x}}px) translateY({{privateData.y}}px) translateZ(0) scale({{privateData.scaleValue}});
             will-change: {{privateData.changeStatus}}; transition-duration: {{privateData.transitionDuration}}s;">
@@ -67,21 +60,27 @@ export default {
     },
 
     computed: {
+        ...internalDataComputedCreator([
+            {name: 'inertia', caster: typesCast.boolCast},
+            {name: 'outOfBounds', caster: typesCast.boolCast},
+            {name: 'disabled', caster: typesCast.boolCast},
+            {name: 'scale', caster: typesCast.boolCast},
+        ]),
         privateData() {
             return this.data.get(privateKey);
         }
     },
 
-    created() {
+    attached() {
+        this.areaPosition = getElementBox(this.el.parentElement);
         const {x, y, scaleValue} = this.data.get();
-        this.data.set(`${privateKey}.x`, x);
-        this.data.set(`${privateKey}.y`, y);
+        let _x = this.coordinateCast(x, 'x', scaleValue);
+        let _y = this.coordinateCast(y, 'y', scaleValue);
+        this.data.set(`${privateKey}.x`, _x);
+        this.data.set(`${privateKey}.y`, _y);
         this.data.set(`${privateKey}.scaleValue`, scaleValue);
         this.initCheckAttr();
         this.cacheScale = this.data.get(`${privateKey}.scaleValue`);
-    },
-
-    attached() {
         this.receiveAreaMessageToScale();
         this.watchParams();
     },
@@ -90,9 +89,9 @@ export default {
      * 鼠标开始触碰事件，区分是位移还是缩放操作，记录其实位置坐标
      * @param {Object} [e] 鼠标event对象
      */
-    onTouchStart(e) {
+    onMovableViewTouchStart(e) {
         this.preventEvents(e);
-        if (attrValBool(this.data.get('disabled'))) {
+        if (this.data.get('__disabled')) {
             return;
         }
         this.stopMove();
@@ -113,9 +112,9 @@ export default {
      * 鼠标移动事件，区分是位移还是缩放，做相应变化
      * @param {Object} [e] 鼠标event对象
      */
-    onTouchMove(e) {
+    onMovableViewTouchMove(e) {
         this.preventEvents(e);
-        if (attrValBool(this.data.get('disabled'))) {
+        if (this.data.get('__disabled')) {
             return;
         }
         this.data.set(`${privateKey}.changeStatus`, 'transform');
@@ -131,9 +130,9 @@ export default {
      * 鼠标结束触碰事件，存储当前为多少手指操作，之后用来判断操作为单指或多指
      * @param {Object} [e] 鼠标event对象
      */
-    onTouchEnd(e) {
+    onMovableViewTouchEnd(e) {
         this.preventEvents(e);
-        if (attrValBool(this.data.get('disabled'))) {
+        if (this.data.get('__disabled')) {
             return;
         }
         this.data.set(`${privateKey}.changeStatus`, 'auto');
@@ -141,6 +140,9 @@ export default {
         // 计算上一次是否为双指缩放，在缩放后放开一只手指和在ios上同时放开后还是走位移逻辑
         this.fingerTouchNum >= 2 && 1 === e.changedTouches.length ? this.isLastDoubleScale = true : this.isLastDoubleScale = false;
         this.fingerTouchNum = this.fingerTouchNum - e.changedTouches.length;
+        // 手指离开时，将 x、y 属性重置
+        this.data.set('x', NaN);
+        this.data.set('y', NaN);
     },
 
     ...computedMethod,
@@ -163,7 +165,6 @@ export default {
      * 数据变动监听
      */
     watchParams() {
-        this.areaPosition = getElementBox(this.el.parentElement);
         this.watch(`${privateKey}.scaleValue`, val => {
             this.data.set(`${privateKey}.transitionDuration`, 0);
             this.triggerScaleEvent(val);
@@ -176,24 +177,38 @@ export default {
         });
         // 下面监听了用户设置的scaleValue、x和y，监听改变校验通过后赋值给内部私有属性
         this.watch('scaleValue', val => {
+            if (Number.isNaN(val)) {
+                return;
+            }
             this.limitRangeOfScaleZoom(privateKey);
             const {scaleMin, scaleMax} = this.data.get();
             val > scaleMin && scaleMin < scaleMax && (this.data.set(`${privateKey}.scaleValue`, val));
         });
         this.watch('x', val => {
+            if (Number.isNaN(val)) {
+                return;
+            }
             const scaleValue = this.data.get(`${privateKey}.scaleValue`);
-            const {width} = getElementBox(this.el);
-            val - this.diffX > this.areaPosition.width - width * scaleValue && (val = this.areaPosition.width - width * scaleValue + this.diffX);
-            val < this.diffX && (val = this.diffX);
-            this.data.set(`${privateKey}.x`, val);
+            let vaule = this.coordinateCast(val, 'x', scaleValue);
+            this.data.set(`${privateKey}.x`, vaule);
         });
         this.watch('y', val => {
+            if (Number.isNaN(val)) {
+                return;
+            }
             const scaleValue = this.data.get(`${privateKey}.scaleValue`);
-            const {height} = getElementBox(this.el);
-            val - this.diffY > this.areaPosition.height - height * scaleValue && (val = this.areaPosition.height - height * scaleValue + this.diffY);
-            val < this.diffY && (val = this.diffY);
-            this.data.set(`${privateKey}.y`, val);
+            let vaule = this.coordinateCast(val, 'y', scaleValue);
+            this.data.set(`${privateKey}.y`, vaule);
         });
+    },
+
+    coordinateCast(value, direction, scaleValue) {
+        let axis = (direction === 'x' ? 'width' : 'height');
+        let wraperLen = getElementBox(this.el)[axis];
+        let diff = direction === 'x' ? this.diffX : this.diffY
+        value - diff > this.areaPosition[axis] - wraperLen * scaleValue && (value = this.areaPosition[axis] - wraperLen * scaleValue + diff);
+        value < diff && (value = diff);
+        return value;
     },
 
     /**
@@ -394,8 +409,10 @@ export default {
      */
     stopMove() {
         const style = global.getComputedStyle(this.el).getPropertyValue('transform');
-        let data = style.match(/\((.+?)\)/g)[0].slice(1, -1).split(',');
-        this.changeXYToMove({x: +data[4], y: +data[5]}, this.data.get('direction'));
+        if (style !== 'none') {
+            let data = style.match(/\((.+?)\)/g)[0].slice(1, -1).split(',');
+            this.changeXYToMove({x: +data[4], y: +data[5]}, this.data.get('direction'));
+        }
     },
 
     /**
@@ -404,7 +421,7 @@ export default {
      */
     changeScaleValue(scale) {
         const {width, height} = getElementBox(this.el);
-        const isScale = this.data.get('scale');
+        const isScale = this.data.get('__scale');
         const {scaleMin, scaleMax} = this.data.get();
         // 若view的宽或高比area大或缩放倍数小于最小值或大于最大值则不能缩放
         if (this.areaPosition.width - width > 0 && this.areaPosition.height - height > 0 && isScale && this.cacheScale * scale > scaleMin && this.cacheScale * scale < scaleMax) {
@@ -451,7 +468,7 @@ export default {
      * @param {Object} [e] 鼠标event对象
      */
     inertiaAction(e) {
-        if (attrValBool(this.data.get('inertia'))) {
+        if (this.data.get('__inertia')) {
             const {pageX, pageY} = e.changedTouches[0];
             const {top, left} = this.areaPosition;
             const {x, y} = this.moveStartPositionInView;

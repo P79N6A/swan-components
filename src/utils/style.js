@@ -1,29 +1,65 @@
 /**
-* @license
-* Copyright Baidu Inc. All Rights Reserved.
-*
-* This source code is licensed under the Apache License, Version 2.0; found in the
-* LICENSE file in the root directory of this source tree.
-*/
-
-/**
  * @file 计算元素样式
  * @author qiaolin(qialin@baidu.com)
+ * @author mabin03(mabin03@baidu.com)
  */
 
- /**
-  * 计算原生贴片位置
-  * @param {Object} element DOM节点
-  */
+import {sanComponentWalker} from './index';
+
+/**
+ * rgb色值转换成十六进制
+ * @param  {string} color rgb色值
+ * @return {string} 十六进制色值
+ */
+export const hexColor = color => {
+    if (color.indexOf('#') >= 0) {
+        return color;
+    } else if (!color) {
+        return '#000000';
+    }
+
+    try {
+        const regular = color.match(/\d+/g);
+        const res = [];
+        regular.map((item, index) => {
+            if (index < 3) {
+                item = parseInt(item, 10).toString(16);
+                item = item.length > 1 ? item : '0' + item;
+                res.push(item);
+            }
+        });
+        if (regular.length > 3) {
+            if (regular.length > 3) {
+                let item = parseFloat(regular.slice(3).join('.'));
+                if (+item === 0) {
+                    res.unshift('00');
+                } else if (item >= 1) {
+                    res.unshift('ff');
+                } else {
+                    item = parseInt(255 * item, 10).toString(16);
+                    item = item.length > 1 ? item : '0' + item;
+                    res.unshift(item);
+                }
+            }
+        }
+        return `#${res.join('')}`;
+    } catch (e) {
+        return 'ff000000';
+    }
+};
+
+/**
+ * 计算原生贴片位置
+ * @param {Object} element DOM节点
+ * @return {Object} object
+ */
 export const computedStyle = element => {
     let component = null;
-    let fixed = false;
     if (Object.prototype.toString.call(element) === '[object Object]' && element.el) {
         component = {
             ...element
         };
         element = component.el;
-        fixed = component.data.get('fixed');
     }
     if (!element) {
         return {
@@ -57,8 +93,8 @@ export const computedStyle = element => {
     };
 
     const position = {
-        left: `${clientRect.left + borderWidth[3] + padding[3] + (fixed ? 0 : scrollX)}`,
-        top: `${clientRect.top + (fixed ? 0 : scrollY)}`,
+        left: `${clientRect.left + borderWidth[3] + padding[3] + scrollX}`,
+        top: `${clientRect.top + scrollY}`,
         width: `${clientRect.width - borderWidth[3] - borderWidth[1] - padding[3] - padding[1]}`,
         height: `${clientRect.height + borderWidth[0] + borderWidth[2]}`
     };
@@ -108,44 +144,20 @@ export const getTransitionParams = element => {
     return res;
 };
 
-/**
- * rgb色值转换成十六进制
- * @param  {string} color rgb色值
- * @return {string} 十六进制色值
- */
-export const hexColor = color => {
-    if (color.indexOf('#') >= 0) {
-        return color;
-    } else if (!color) {
-        return '#000000';
-    }
-
-    try {
-        const regular = color.match(/\d+/g);
-        const res = [];
-        regular.map((item, index) => {
-            if (index < 3) {
-                item = parseInt(item, 10).toString(16);
-                item = item.length > 1 ? item : '0' + item;
-                res.push(item);
-            }
-        });
-        if (regular.length > 3) {
-            if (regular.length > 3) {
-                let item = parseFloat(regular.slice(3).join('.'));
-                if (+item === 0) {
-                    res.unshift('00');
-                } else if (item >= 1) {
-                    res.unshift('ff');
-                } else {
-                    item = parseInt(255 * item, 10).toString(16);
-                    item = item.length > 1 ? item : '0' + item;
-                    res.unshift(item);
-                }
-            }
-        }
-        return `#${res.join('')}`;
-    } catch (e) {
-        return 'ff000000';
-    }
+export const parseMatrix = matrixStr => {
+    const matrixArr = matrixStr.match
+        && matrixStr.match(/matrix\(([^,]+),\s*([^,]+),\s*([^,]+),\s*([^,]+),\s*([^,]+),\s*([^,]+)\)/);
+    return matrixArr ? matrixArr.slice(1).map(o => +o) : false;
 };
+
+export const getCoordinatePairFromMatrixStr = matrixStr => {
+    const matrixArr = parseMatrix(matrixStr);
+    return {
+        x: matrixArr ? matrixArr[4] : 0,
+        y: matrixArr ? matrixArr[5] : 0
+    };
+};
+
+export const rpx2Vm = raw => raw.replace(/(\d+(\.\d+)?)rpx/g, (...arg) => {
+    return ((+arg[1]) / 7.5) + 'vw';
+});

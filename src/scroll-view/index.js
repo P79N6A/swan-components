@@ -1,17 +1,9 @@
 /**
-* @license
-* Copyright Baidu Inc. All Rights Reserved.
-*
-* This source code is licensed under the Apache License, Version 2.0; found in the
-* LICENSE file in the root directory of this source tree.
-*/
-
-/**
  * @file bdml's file's base elements <scroll-view>
  * @author zengqingzhuang(zengqingzhuang@baidu.com)
  */
 import style from './index.css';
-import {attrValBool} from '../utils';
+import {internalDataComputedCreator, typesCast} from '../computedCreator';
 
 export default {
 
@@ -22,9 +14,9 @@ export default {
             <div s-ref="wrap" class="swan-scroll-view">
                 <div s-ref="main" class="swan-scroll-view scroll-view-compute-offset"
                     on-scroll="onScroll($event)"
-                    on-touchend="onTouchEnd($event)"
-                    on-touchstart="onTouchStart($event)"
-                    on-touchmove="onTouchMove($event)">
+                    on-touchend="onScrollViewTouchEnd($event)"
+                    on-touchstart="onScrollViewTouchStart($event)"
+                    on-touchmove="onScrollViewTouchMove($event)">
                     <div s-ref="content">
                         <slot></slot>
                     </div>
@@ -52,8 +44,23 @@ export default {
             scrollLeft: 0, // 设置横向滚动条位置
             scrollTop: 0, // 设置竖向滚动条位置
             scrollWithAnimation: false, // 是否动画过渡
-            scrollIntoView: '' // 元素id,滚动到该元素
+            scrollIntoView: '', // 元素id,滚动到该元素
+            enableBackToTop: false
         };
+    },
+
+    computed: {
+        ...internalDataComputedCreator([
+            {name: 'upperThreshold', caster: typesCast.numCast, default: 50},
+            {name: 'lowerThreshold', caster: typesCast.numCast, default: 50},
+            {name: 'scrollY', caster: typesCast.boolCast},
+            {name: 'scrollX', caster: typesCast.boolCast},
+            {name: 'scrollLeft', caster: typesCast.numCast},
+            {name: 'scrollTop', caster: typesCast.numCast},
+            {name: 'scrollWithAnimation', caster: typesCast.boolCast},
+            {name: 'scrollIntoView', caster: typesCast.stringCast},
+            {name: 'enableBackToTop', caster: typesCast.boolCast}
+        ])
     },
 
     attached() {
@@ -61,19 +68,13 @@ export default {
         this.wrap = this.ref('wrap');
         this.main = this.ref('main');
         this.content = this.ref('content');
-        this.upperThresHold = +pageData.upperThreshold;
-        this.lowerThreshold = +pageData.lowerThreshold;
-        this.scrollWithAnimation = attrValBool(pageData.scrollWithAnimation);
-        this.scrollX = attrValBool(this.data.get('scrollX'));
-        this.scrollY = attrValBool(this.data.get('scrollY'));
         this.watchParams();
+        this.isBackToTop();
         this.scrollXChanged();
-        this.scrollY && this.scrollYChanged();
-        pageData.scrollIntoView && this.scrollIntoViewChanged();
-        pageData.scrollLeft && this.scrollLeftChanged(pageData.scrollLeft);
-        pageData.scrollTop && this.scrollTopChanged(pageData.scrollTop);
-        this.data.set('scrollLeft', '');
-        this.data.set('scrollTop', '');
+        this.scrollYChanged();
+        pageData.__scrollIntoView && this.scrollIntoViewChanged();
+        pageData.__scrollLeft && this.scrollLeftChanged();
+        pageData.__scrollTop && this.scrollTopChanged();
     },
 
     /**
@@ -83,17 +84,25 @@ export default {
         this.watch('scrollLeft', leftVal => {
             if (leftVal || parseInt(leftVal, 10) === 0) {
                 this.main.style.webkitOverflowScrolling = 'auto';
-                this.scrollLeftChanged(leftVal);
+                this.scrollLeftChanged();
             }
         });
         this.watch('scrollTop', topVal => {
             if (topVal || parseInt(topVal, 10) === 0) {
                 this.main.style.webkitOverflowScrolling = 'auto';
-                this.scrollTopChanged(topVal);
+                this.scrollTopChanged();
             }
         });
         this.watch('scrollIntoView', value => {
             value && this.scrollIntoViewChanged();
+        });
+        this.watch('scrollX', value => {
+            this.scrollXChanged();
+            this.scrollYChanged();
+        });
+        this.watch('scrollY', value => {
+            this.scrollXChanged();
+            this.scrollYChanged();
         });
     },
 
@@ -101,17 +110,26 @@ export default {
      * 数据变更重新计算样式
      */
     slaveUpdated() {
-        if (this.scrollX && (this.contentHeight !== this.content.offsetHeight)) {
+        if (this.data.get('__scrollX') && (this.contentHeight !== this.content.offsetHeight)) {
             this.contentHeight = this.content.offsetHeight;
             this.scrollXChanged();
         }
     },
 
     /**
+     * 接收并响应page.js中接收的端上派发的点击标题回调
+     */
+    isBackToTop() {
+        this.communicator.onMessage('scrollView-backTotop', () => {
+            this.data.get('__enableBackToTop') && this.scrollTo(0, 'y');
+        });
+    },
+
+    /**
      * 横向滚动样式设置
      */
     scrollXChanged() {
-        if (this.scrollX) {
+        if (this.data.get('__scrollX')) {
             this.checkIsAutoHeight();
             this.main.style.overflowX = 'auto';
             this.main.style.overflowY = 'hidden';
@@ -125,6 +143,7 @@ export default {
             this.wrap.style.height = '';
             this.main.style.overflowX = 'hidden';
             this.main.style.paddingBottom = '';
+            this.content.style.height = '100%';
         }
     },
 
@@ -141,25 +160,24 @@ export default {
      * 竖向滚动样式设置
      */
     scrollYChanged() {
-        this.main.style.overflowY = 'auto';
-        this.content.style.height = '100%';
+        this.main.style.overflowY = this.data.get('__scrollY') ? 'auto' : 'hidden';
     },
 
     /**
      * 横向滚动条位置
-     * @param {number} [scrollLeft] 横向滚动条位置
      */
-    scrollLeftChanged(scrollLeft) {
-        this.scrollWithAnimation ? this.scrollTo(scrollLeft, 'x')
+    scrollLeftChanged() {
+        const scrollLeft = this.data.get('__scrollLeft');
+        this.data.get('__scrollWithAnimation') ? this.scrollTo(scrollLeft, 'x')
             : (this.main.scrollLeft = scrollLeft, this.main.style.webkitOverflowScrolling = 'touch');
     },
 
     /**
      * 竖向滚动条位置
-     * @param {number} [scrollTop] 竖向滚动条位置
      */
-    scrollTopChanged(scrollTop) {
-        this.scrollWithAnimation ? this.scrollTo(scrollTop, 'y')
+    scrollTopChanged() {
+        const scrollTop = this.data.get('__scrollTop');
+        this.data.get('__scrollWithAnimation') ? this.scrollTo(scrollTop, 'y')
             : (this.main.scrollTop = scrollTop, this.main.style.webkitOverflowScrolling = 'touch');
     },
 
@@ -168,19 +186,19 @@ export default {
      */
     scrollIntoViewChanged() {
         const pageData = this.data.get();
-        const scrollIntoViewId = pageData.scrollIntoView;
+        const scrollIntoViewId = pageData.__scrollIntoView;
         if (scrollIntoViewId) {
             const scrollTarget = this.main.querySelector(`#${scrollIntoViewId}`);
             if (scrollTarget) {
                 const targetScroll = scrollTarget.getBoundingClientRect();
                 const mainScroll = this.main.getBoundingClientRect();
-                if (pageData.scrollX) {
+                if (pageData.__scrollX) {
                     const scrollLeft = this.main.scrollLeft + targetScroll.left - mainScroll.left;
-                    pageData.scrollWithAnimation ? this.scrollTo(scrollLeft, 'x') : this.main.scrollLeft = scrollLeft;
+                    pageData.__scrollWithAnimation ? this.scrollTo(scrollLeft, 'x') : this.main.scrollLeft = scrollLeft;
                 }
-                if (pageData.scrollY) {
+                if (pageData.__scrollY) {
                     const scrollTop = this.main.scrollTop + targetScroll.top - mainScroll.top;
-                    pageData.scrollWithAnimation ? this.scrollTo(scrollTop, 'y') : this.main.scrollTop = scrollTop;
+                    pageData.__scrollWithAnimation ? this.scrollTo(scrollTop, 'y') : this.main.scrollTop = scrollTop;
                 }
             }
         }
@@ -263,15 +281,11 @@ export default {
         // 如果clientWidth比scrollWidth小，证明有必要触发一下，如果clientWidth比scrollWidth还大的话，证明没必要触发scrolltolower了,
         // 所以叫noNeedWidthScroll
         if (type === 'x') {
-            const hasScrollX = !!this.data.get('scrollX');
             const noNeedWidthScroll = target.clientWidth >= target.scrollWidth;
-            return hasScrollX && !noNeedWidthScroll;
+            return this.data.get('__scrollX') && !noNeedWidthScroll;
         }
-        else {
-            const hasScrollY = !!this.data.get('scrollY');
-            const noNeedHeightScroll = target.clientHeight >= target.scrollHeight;
-            return hasScrollY && !noNeedHeightScroll;
-        }
+        const noNeedHeightScroll = target.clientHeight >= target.scrollHeight;
+        return this.data.get('__scrollY') && !noNeedHeightScroll;
     },
 
     /**
@@ -281,26 +295,25 @@ export default {
      */
     computeScrollDirection(target) {
         const {topDistance, leftDistance, rightDistance, bottomDistance} = this.computeScrollRect(target);
-        const {upperThresHold, lowerThreshold} = this;
         const deltaX = this.lastLeftDistance - leftDistance;
         const deltaY = this.lastTopDistance - topDistance;
         const scrollingRight = deltaX < 0;
         const scrollingLeft = deltaX > 0;
         const scrollingUp = deltaY > 0;
         const scrollingDown = deltaY < 0;
-        const scrollDirections = [];
+        const scrollDirections = ['bindscroll'];
         // 是否横向触发lower
         const horizontalTriggerLower = this.shouldProccessScroll(target, 'x')
-                && rightDistance <= lowerThreshold && scrollingRight;
+                && rightDistance <= this.data.get('__lowerThreshold') && scrollingRight;
         // 是否纵向触发lower
         const verticalTriggerLower = this.shouldProccessScroll(target, 'y')
-                && bottomDistance <= lowerThreshold && scrollingDown;
+                && bottomDistance <= this.data.get('__lowerThreshold') && scrollingDown;
         // 是否横向触发upper
         const horizontalTriggerUpper = this.shouldProccessScroll(target, 'x')
-                && leftDistance <= upperThresHold && scrollingLeft;
+                && leftDistance <= this.data.get('__upperThreshold') && scrollingLeft;
         // 是否纵向触发upper
         const verticalTriggerUpper = this.shouldProccessScroll(target, 'y')
-                && topDistance <= upperThresHold && scrollingUp;
+                && topDistance <= this.data.get('__upperThreshold') && scrollingUp;
 
         if (horizontalTriggerLower || verticalTriggerLower) {
             scrollDirections.push('bindscrolltolower');
@@ -309,8 +322,6 @@ export default {
         if (horizontalTriggerUpper || verticalTriggerUpper) {
             scrollDirections.push('bindscrolltoupper');
         }
-
-        scrollDirections.push('bindscroll');
         return scrollDirections;
     },
 
@@ -345,6 +356,7 @@ export default {
         this.data.set('scrollTop', '');
         this.data.set('scrollLeft', '');
         this.data.set('scrollIntoView', '');
+        this.contentHeight = this.content.offsetHeight;
         this.lastScrollTime = $event.timeStamp;
         const target = $event.target;
         Object.assign(target, {
@@ -360,36 +372,60 @@ export default {
         this.lastLeftDistance = target.scrollLeft;
         this.lastTopDistance = target.scrollTop;
         // image组件懒加载
-        this.communicator.fireMessage({type: 'imgLazyLoad'});
+        this.communicator.fireMessage({type: 'componentScroll'});
     },
 
-    onTouchStart($event) {
+    onScrollViewTouchStart($event) {
         const touch = $event.changedTouches[0];
         this.startPageX = touch.pageX;
         this.startPageY = touch.pageY;
+        // 触发layout ios下 fixed scroll卡死的问题 patch
+        if (this.swaninterface.boxjs.platform.isIOS() && this.data.get('__scrollX')) {
+            this.main.style.overflowY = '';
+        }
+        if (this.swaninterface.boxjs.platform.isIOS() && this.data.get('__scrollY')) {
+            this.main.style.overflowX = '';
+        }
         // 阻止ios webview回弹效果
         this.swaninterface.boxjs.platform.isIOS() && this.boxjs.ui.close({
             name: 'swan-springback'
         });
+        this.boxjs.ui.open({
+            name: 'swan-preventPullDownRefresh',
+            data: {
+                prevent: true,
+                slaveId: `${this.slaveId}`
+            }
+        });
     },
 
-    onTouchMove($event) {
+    onScrollViewTouchMove($event) {
         const touch = $event.changedTouches[0];
+        // 触发layout ios下 fixed scroll卡死的问题 patch
+        if (this.swaninterface.boxjs.platform.isIOS() && this.data.get('__scrollX') && this.direction === 'x') {
+            this.main.style.overflowY = 'hidden';
+        }
+        if (this.swaninterface.boxjs.platform.isIOS() && this.data.get('__scrollY') && this.direction === 'y') {
+            this.main.style.overflowX = 'hidden';
+        }
         if (!this.direction) {
             Math.abs(touch.pageX - this.startPageX) >= Math.abs(touch.pageY - this.startPageY)
                 ? this.direction = 'x' : this.direction = 'y';
         }
-        this.data.get('scrollX') && this.direction === 'x' && $event.stopPropagation();
-        this.data.get('scrollY') && this.direction === 'y' && $event.stopPropagation();
     },
 
-    onTouchEnd($event) {
-        this.data.get('scrollX') && this.direction === 'x' && $event.stopPropagation();
-        this.data.get('scrollY') && this.direction === 'y' && $event.stopPropagation();
+    onScrollViewTouchEnd($event) {
         this.direction = '';
         // 开启ios webview回弹效果
         this.swaninterface.boxjs.platform.isIOS() && this.boxjs.ui.open({
             name: 'swan-springback'
+        });
+        this.boxjs.ui.open({
+            name: 'swan-preventPullDownRefresh',
+            data: {
+                prevent: false,
+                slaveId: `${this.slaveId}`
+            }
         });
     }
 };

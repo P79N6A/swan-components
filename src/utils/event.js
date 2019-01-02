@@ -1,29 +1,8 @@
 /**
-* @license
-* Copyright Baidu Inc. All Rights Reserved.
-*
-* This source code is licensed under the Apache License, Version 2.0; found in the
-* LICENSE file in the root directory of this source tree.
-*/
-
-/**
  * @file 事件相关属性以事件相关方法集合
  * @author zengqingzhuang(zengqingzhuang@baidu.com)
  */
-import san from 'san';
 import {sanComponentWalker, datasetFilter} from './index';
-
-const eventProxyAnode = san.parseTemplate(`<a
-    on-touchstart="onTouchStart($event, false)"
-    on-touchstart="capture:onTouchStart($event, true)"
-    on-touchmove="onTouchMove($event, false)"
-    on-touchmove="capture:onTouchMove($event, true)"
-    on-touchend="onTouchEnd($event, false)"
-    on-touchend="capture:onTouchEnd($event, true)"
-    on-touchcancel="onTouchcancel($event)"
-    on-touchcancel="capture:onTouchcancel($event, true)"
-    on-contextmenu="onContextmenu($event)"
-></a>`);
 
 // 获取默认绑定的事件集合
 const normalEventList = [
@@ -46,16 +25,28 @@ const nativeBehaviorEventList = [
     'contextmenu'
 ];
 
-const normalEvents = eventProxyAnode.children[0].events
-.filter(event => normalEventList.includes(event.name));
+export const eventProxyAnode = san => san.parseTemplate(`<a
+    on-touchstart="onTouchStart($event, false)"
+    on-touchstart="capture:onTouchStart($event, true)"
+    on-touchmove="onTouchMove($event, false)"
+    on-touchmove="capture:onTouchMove($event, true)"
+    on-touchend="onTouchEnd($event, false)"
+    on-touchend="capture:onTouchEnd($event, true)"
+    on-touchcancel="onTouchcancel($event)"
+    on-touchcancel="capture:onTouchcancel($event, true)"
+    on-contextmenu="onContextmenu($event)"
+></a>`);
 
-const nativeBehaviorEvents = eventProxyAnode.children[0].events
-.filter(event => nativeBehaviorEventList.includes(event.name));
+const eventUtilsCache = {};
 
-export const eventUtils = {
-    normalEvents,
-    nativeBehaviorEvents
-};
+export const eventUtils = san => ({
+    normalEvents: eventUtilsCache.normalEvents
+    || (eventUtilsCache.normalEvents = eventProxyAnode(san).children[0].events
+    .filter(event => normalEventList.includes(event.name))),
+    nativeBehaviorEvents: eventUtilsCache.nativeBehaviorEvents
+    || (eventUtilsCache.nativeBehaviorEvents = eventProxyAnode(san).children[0].events
+    .filter(event => nativeBehaviorEventList.includes(event.name)))
+});
 
 /**
  * 判断用户是否绑定了事件
@@ -148,29 +139,15 @@ const exchangeDomEvent = ($event, eventType) => {
     return eventData;
 };
 
-// 公共事件
-const publicEventMap = {
-    tap: exchangeDomEvent,
-    click: exchangeDomEvent,
-    longpress: exchangeDomEvent,
-    longtap: exchangeDomEvent,
-    touchstart: exchangeDomEvent,
-    touchmove: exchangeDomEvent,
-    touchend: exchangeDomEvent,
-    touchcancel: exchangeDomEvent,
-    touchforcechange: exchangeDomEvent, // 仅ios有此事件
-    hcancel: exchangeDomEvent,
-    htouchmove: exchangeDomEvent, // moveable-view组件使用
-    vtouchmove: exchangeDomEvent // moveable-view组件使用
-};
-
 /**
- * 用户自定义事件事件对象组装
+ * 用户自定义事件对象组装
  * @param {string} eventType 事件类型
  * @param {Object} $event 事件对象
  * @return {Object} 处理过的event对象
  */
 export const eventProccesser = (eventType, $event) => {
-    let customEvent = publicEventMap[eventType] || defaultEvent;
-    return customEvent($event, eventType);
+    if ($event.target && $event.target.tagName) {
+        return exchangeDomEvent($event, eventType);
+    }
+    return defaultEvent($event, eventType);
 };

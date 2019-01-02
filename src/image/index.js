@@ -1,22 +1,16 @@
 /**
-* @license
-* Copyright Baidu Inc. All Rights Reserved.
-*
-* This source code is licensed under the Apache License, Version 2.0; found in the
-* LICENSE file in the root directory of this source tree.
-*/
-
-/**
  * @file swan's file's base elements <image>
  * @author zengqingzhuang(zengqingzhuang@baidu.com)
  */
 import styles from './index.css';
-import {attrValBool} from '../utils';
+import {internalDataComputedCreator, typesCast} from '../computedCreator';
 
 export default {
 
     constructor(props) {
         this.aheadDistance = 50; // 提前懒加载的距离
+        this.rate = 1; // 图片 宽/高 比例
+        this.originalHeight = ''; // 开发者设置在style上的高度
     },
 
     behaviors: ['userTouchEvents', 'noNativeBehavior', 'animateEffect'],
@@ -29,34 +23,68 @@ export default {
         };
     },
 
+    computed: {
+        ...internalDataComputedCreator([
+            {name: 'src', caster: typesCast.stringCast},
+            {name: 'mode', data: ['scaleToFill', 'aspectFit', 'aspectFill', 'widthFix',
+                'top', 'bottom', 'center', 'left', 'right', 'top left',
+                'top right', 'bottom left', 'bottom right']},
+            {name: 'lazyLoad', caster: typesCast.boolCast}
+        ])
+    },
+
     template: `<swan-image>
             <div s-ref="img"></div>
         </swan-image>`,
 
     attached() {
         this.img = this.ref('img');
-        this.changeMode(this.data.get('mode'));
+        this.changeMode(this.data.get('__mode'));
         this.getImgPath();
-        this.scrollImage();
+        this.bindLazyLoadEvents();
         // 要确保setOutsideRulesPosition在changeMode后面调用，因为改了image的position
         this.setOutsideRulesPosition();
-    },
-
-    scrollImage() {
-        if (attrValBool(this.data.get('lazyLoad'))) {
-            // scroll-view组件里的懒加载
-            this.communicator.onMessage('imgLazyLoad', data=> {
-                this.getImgPath();
-            });
-            // Page里的懒加载
-            window.addEventListener('scroll', e => {
-                this.getImgPath();
-            });
-        }
+        this.watch('mode', val => {
+            if (val !== 'widthFix') {
+                this.el.style.height = this.originalHeight;
+            }
+            this.changeMode(this.data.get('mode'));
+            this.setOutsideRulesPosition();
+        });
         this.watch('src', src => {
             this.loaded = false;
             this.getImgPath();
         });
+    },
+
+    detached() {
+        this.unbindLazyLoadEvents();
+    },
+
+    slaveUpdated() {
+        // 对于widthFix的特殊处理，保持图片比例
+        if (this.data.get('__mode') === 'widthFix') {
+            this.handleWidthFixMode();
+        }
+    },
+
+    bindLazyLoadEvents() {
+        if (!this.data.get('__lazyLoad')) {
+            return;
+        }
+        this.lazyloadHandler = () => {
+            this.getImgPath();
+        };
+        // scroll-view, swiper组件里的懒加载
+        this.communicator.onMessage('componentScroll', this.lazyloadHandler);
+        // Page里的懒加载
+        window.addEventListener('scroll', this.lazyloadHandler);
+    },
+
+    unbindLazyLoadEvents() {
+        this.lazyloadHandler && this.communicator.delHandler('componentScroll', this.lazyloadHandler);
+        this.lazyloadHandler && window.removeEventListener('scroll', this.lazyloadHandler);
+        delete this.lazyloadHandler;
     },
 
     /**
@@ -150,7 +178,8 @@ export default {
      */
     isShowImgInPage() {
         let rect = this.img.getBoundingClientRect();
-        return rect.top >= 0 && rect.left >= 0 && rect.top <= window.innerHeight && rect.left <= window.innerWidth;
+        return rect.top + this.img.offsetHeight >= 0 && rect.left + this.img.offsetWidth >= 0
+            && rect.top <= window.innerHeight && rect.left <= window.innerWidth;
     },
 
     /**
@@ -159,7 +188,7 @@ export default {
      * @return {string} 图片地址
      */
     getImgPath() {
-        const src = this.data.get('src');
+        const src = this.data.get('__src');
         if (!src) {
             return;
         }
@@ -187,20 +216,26 @@ export default {
      * 加载背景图
      */
     loadImage(imgPath) {
-        imgPath = attrValBool(this.data.get('lazyLoad'))
+        imgPath = this.data.get('__lazyLoad')
             ? (this.isShowImgInPage() ? imgPath : false) : imgPath;
 
         if (imgPath && !this.loaded) {
             this.tryLoadImg(imgPath)
             .then(imgEntity => {
-                // 对于widthFix的特殊处理，拉伸图片元素
-                if (this.data.get('mode') === 'widthFix') {
-                    const rate = imgEntity.width / imgEntity.height;
-                    this.el.style.height = this.el.offsetWidth / rate + 'px';
-                    this.img.style.height = this.el.offsetWidth / rate + 'px';
+                this.rate = imgEntity.width / imgEntity.height;
+                this.originalHeight = this.el.style.height; // 记录开发者通过 style="height: xxx" 方式设置的高度，当mode由widthFix变为其它需要还原到此height
+                // 对于widthFix的特殊处理，保持图片比例
+                if (this.data.get('__mode') === 'widthFix') {
+                    this.handleWidthFixMode();
                 }
+            }).catch(e => {
+                console.error('image load faild');
             });
             this.img.style.backgroundImage = `url('${imgPath}')`;
+            this.img.style.transform = 'translateZ(0)';
+            setTimeout(() => {
+                this.img.style.transform = '';
+            }, 0);
             this.loaded = true;
         }
     },
@@ -232,6 +267,13 @@ export default {
             };
             imgEntity.src = imgPath;
         });
+    },
+
+    /**
+     * 对于widthFix的特殊处理，保持图片比例
+     */
+    handleWidthFixMode() {
+        this.el.style.height = this.el.offsetWidth / this.rate + 'px';
     }
 };
 

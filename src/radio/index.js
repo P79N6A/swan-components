@@ -1,17 +1,9 @@
 /**
-* @license
-* Copyright Baidu Inc. All Rights Reserved.
-*
-* This source code is licensed under the Apache License, Version 2.0; found in the
-* LICENSE file in the root directory of this source tree.
-*/
-
-/**
  * @file    bdml's file's base elements <radio>
  * @author  mabin(mabin03@baidu.com)
  */
 import style from './index.css';
-import {attrValBool} from '../utils';
+import {internalDataComputedCreator, typesCast} from '../computedCreator';
 
 /**
  * Radio
@@ -39,8 +31,8 @@ export default {
          */
         getRadioInputClass() {
             let res = ['swan-radio-input'];
-            attrValBool(this.data.get('checked')) && res.push('swan-radio-input-checked');
-            attrValBool(this.data.get('disabled')) && res.push('swan-radio-input-disabled');
+            this.data.get('__checked') && res.push('swan-radio-input-checked');
+            this.data.get('__disabled') && res.push('swan-radio-input-disabled');
             return res.join(' ');
         },
 
@@ -50,8 +42,13 @@ export default {
          * @return {string} 边框颜色
          */
         getRadioInputColor() {
-            return attrValBool(this.data.get('checked')) ? this.data.get('color') : '';
-        }
+            return this.data.get('__checked') ? this.data.get('__color') : '';
+        },
+        ...internalDataComputedCreator([
+            {name: 'color', caster: typesCast.stringCast, default: '#3c76ff'},
+            {name: 'checked', caster: typesCast.boolCast},
+            {name: 'disabled', caster: typesCast.boolCast}
+        ])
     },
 
     template: `<swan-radio on-click="radioTap($event)">
@@ -77,10 +74,10 @@ export default {
      */
     attached() {
         this.nextTick(() => {
-            const {value, checked} = this.data.get();
+            const {value, __checked} = this.data.get();
 
             // 监听 checked 变化
-            this.watch('checked', checked => {
+            this.watch('__checked', checked => {
                 // 向 radio-group 派发 radio 的选中状态被切换的消息
                 this.radioGroup && this.dispatch('radio:checkedChanged', {
                     value,
@@ -93,7 +90,7 @@ export default {
             this.dispatch('radio:added', {
                 value,
                 id: this.id,
-                checked
+                checked: __checked
             });
 
             // 声明点击 label 触发 label 内第一个控件的事件
@@ -142,8 +139,8 @@ export default {
      * @param {Event} $event 对象
      */
     radioTap($event) {
-        const {disabled, checked} = this.data.get();
-        if (!attrValBool(disabled) && !attrValBool(checked)) {
+        const {__disabled, __checked} = this.data.get();
+        if (!__disabled && !__checked) {
             this.data.set('checked', true);
             // 向 radio-group 派发 radio 已选中的消息
             this.radioGroup && this.dispatch('radio:checked', $event);

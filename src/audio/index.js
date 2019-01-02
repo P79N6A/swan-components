@@ -1,25 +1,17 @@
 /**
-* @license
-* Copyright Baidu Inc. All Rights Reserved.
-*
-* This source code is licensed under the Apache License, Version 2.0; found in the
-* LICENSE file in the root directory of this source tree.
-*/
-
-/**
  * @file bdml's file's base elements <audio>
  * @author  raowenjuan(raowenjuan@baidu.com)
  *          mabin(mabin03@baidu.com)
  */
 
 import style from './index.css';
-import {attrValBool, formatTime, privateKey} from '../utils';
+import {formatTime, privateKey} from '../utils';
+import {internalDataComputedCreator, typesCast} from '../computedCreator';
 
 export default {
     constructor(props) {
         this.timer = null;
         this.audio = null;
-        this.src = null;
     },
 
     initData() {
@@ -53,7 +45,7 @@ export default {
          * @return {string} audioShowClassName
          */
         audioShowClassName() {
-            return attrValBool(this.data.get('controls')) ? '' : style.hide;
+            return this.data.get('__controls') ? '' : style.hide;
         },
 
         /**
@@ -62,7 +54,12 @@ export default {
          */
         provideData() {
             return this.data.get(privateKey);
-        }
+        },
+
+        ...internalDataComputedCreator([
+            {name: 'controls', caster: typesCast.boolCast},
+            {name: 'loop', caster: typesCast.boolCast}
+        ])
     },
 
     template: `<swan-audio class="${style['swan-audio-common']} {{audioShowClassName}}"
@@ -71,8 +68,8 @@ export default {
         name="{{name}}"
         poster="{{poster}}"
         src="{{src}}"
-        controls="{{controls}}"
-        loop="{{loop}}">
+        controls="{{__controls}}"
+        loop="{{__loop}}">
         <div class="${style['swan-audio-wrapper']}">
             <div class="${style['swan-audio-left']}">
                 <div class="${style.imgwrap}">
@@ -92,7 +89,31 @@ export default {
      * 组件创建
      */
     attached() {
+        this.createNewAudio();
+        this.watch('src', val => {
+            this.createNewAudio(val);
+        });
+    },
+
+    /**
+     * 创建audio并设置监听函数
+     *
+     * @param {string=} newSrc 变化后src
+     */
+    createNewAudio(newSrc) {
+        // 第一次没有this.audio
+        this.audio && this.audio.pause();
+        this.data.set(`${privateKey}.currentTime`, '00:00');
         this.audio = new global.Audio();
+        this.bindLoadEvents();
+        this.audio.src = newSrc || this.data.get('src');
+        this.onended()
+            .onplay()
+            .onpause()
+            .ontimeupdate();
+    },
+
+    bindLoadEvents() {
         this.audio.onerror = e => {
             const code = e.srcElement.error.code;
             let msg = '';
@@ -112,6 +133,8 @@ export default {
                 }
             });
         };
+        // window.audio 没有 onload事件，所以这里触发不了： https://developer.mozilla.org/en-US/docs/Web/Guide/Events/Media_events
+        // 文档上也没有说明bindload
         this.audio.onload = e => {
             this.dispatchEvent('bindload', {
                 detail: {
@@ -127,30 +150,10 @@ export default {
     detached() {
         if (this.audio) {
             this.audio.pause();
+            this.timer && clearInterval(this.timer);
             this.timer = null;
             this.audio = null;
-            this.src = null;
         }
-    },
-
-    /**
-     * 响应数据变化
-     */
-    slaveRendered() {
-        this.nextTick(() => {
-            const src = this.data.get('src');
-            if (src !== this.src && this.audio) {
-                this.audio.pause();
-                this.data.set(`${privateKey}.currentTime`, '00:00');
-                this.audio = new global.Audio();
-                this.audio.src = src;
-                this.src = src;
-                this.onended()
-                    .onplay()
-                    .onpause()
-                    .ontimeupdate();
-            }
-        });
     },
 
     /**
@@ -159,11 +162,10 @@ export default {
      * @return {Object} 链式调用对象
      */
     onended() {
-        const loop = this.data.get('loop');
         this.audio.onended = () => {
             this.data.set(`${privateKey}.playState`, 0);
             this.getEndTime();
-            if (attrValBool(loop)) {
+            if (this.data.get('__loop')) {
                 this.audio.play();
             }
             this.dispatchEvent('bindended', {
@@ -202,7 +204,7 @@ export default {
         this.audio.onpause = () => {
             this.data.set(`${privateKey}.playState`, 0);
             this.getEndTime();
-            this.dispatchEvent('bindpause', {
+            this.audio && this.dispatchEvent('bindpause', {
                 detail: {
                     duration: this.audio.duration
                 }
@@ -218,7 +220,7 @@ export default {
      */
     ontimeupdate() {
         this.audio.ontimeupdate = () => {
-            this.dispatchEvent('bindtimeupdate', {
+            this.audio && this.dispatchEvent('bindtimeupdate', {
                 detail: {
                     currentTime: this.audio.currentTime,
                     duration: this.audio.duration

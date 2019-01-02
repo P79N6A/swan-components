@@ -1,21 +1,19 @@
-/**
-* @license
-* Copyright Baidu Inc. All Rights Reserved.
-*
-* This source code is licensed under the Apache License, Version 2.0; found in the
-* LICENSE file in the root directory of this source tree.
-*/
-
 import { boxjsDataGetMock, boxjsDataGetAsyncMock, boxjsDataGetCallbackMock, boxjsCoverInsertMock, boxjsCoverUpdateMock, boxjsCoverRemoveMock, boxjsUiMock, boxjsDeviceMock } from './mock-data';
 export default () => ({
     boxjs: {
         data: {
             get(query) {
-                const name = query.name;
+                let name = query.name;
+                const queryData = query.data || {};
+                // mock 未登录状态
+                if (name === 'swan-privateGetUserInfo') {
+                    name = query.data.unLogined ? 'swan-privateGetUserInfo-unLogined' : name;
+                }
                 if (boxjsDataGetCallbackMock[name]
-                    && (query.data.callback || query.data.cb)) {
-                    setTimeout( () => {
-                        let callback = query.data.callback || query.data.cb;
+                    && (queryData.callback || queryData.cb)) {
+                    setTimeout(() => {
+                        let callback = queryData.callback || queryData.cb;
+
                         switch (typeof callback) {
                             case 'string':
                                 window[callback]
@@ -26,7 +24,6 @@ export default () => ({
                                 break;
                         }
                     }, 0);
-                    
                 }
                 if (boxjsDataGetMock[name]) {
                     return boxjsDataGetMock[name];
@@ -44,7 +41,30 @@ export default () => ({
             insert(options) {
                 let name = options.name;
                 if (boxjsCoverInsertMock[name]) {
-                    return Promise.resolve(boxjsCoverInsertMock[name].res);
+                    // mock 二级回调
+                    if (name === 'swan-coverimage') {
+                        let imgEntity = new Image();
+                        imgEntity.onerror = () => {
+                            options.data.callback(JSON.stringify({
+                                data: {
+                                    type: 'loadState',
+                                    loadState: 'error'
+                                }
+                            }));
+                        };
+                        imgEntity.onload = () => {
+                            options.data.callback(JSON.stringify({
+                                data: {
+                                    type: 'loadState',
+                                    loadState: 'finish'
+                                }
+                            }));
+                        };
+                        imgEntity.src = options.data.src;
+                        return Promise.resolve(boxjsCoverInsertMock[name].res);
+                    } else {
+                        return Promise.resolve(boxjsCoverInsertMock[name].res);
+                    }
                 } else {
                     return Promise.reject();
                 }
@@ -91,8 +111,19 @@ export default () => ({
                 return Promise.resolve();
             }
         },
+        button: {
+            insert(options) {
+                return Promise.resolve();
+            },
+            update(options) {
+                return Promise.resolve();
+            },
+            remove(options) {
+                return Promise.resolve();
+            }
+        },
         map: {
-            operate () {
+            operate() {
                 return Promise.resolve();
             }
         },
@@ -163,6 +194,9 @@ export default () => ({
             vibrateShort(){
                 return Promise.resolve();
             }
+        },
+        log() {
+            return Promise.resolve();
         }
     },
     swan: {

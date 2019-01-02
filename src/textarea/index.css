@@ -1,0 +1,54 @@
+swan-textarea {
+    display: block;
+    width: 300px;
+    height: 150px;
+    position: relative;
+    font-size: 16px;
+}
+
+swan-textarea[hidden] {
+    display: none;
+}
+
+swan-textarea textarea {
+    border: none;
+    padding: 0;
+    resize: none;
+    background-color: transparent;
+    line-height: 1.2;
+    z-index: 2;
+    position: absolute;
+    font-family: inherit;
+    background: transparent;
+    box-sizing: border-box;
+}
+
+swan-textarea .compute {
+    color: transparent;
+    top: 0;
+    z-index: 0;
+}
+
+swan-textarea div {
+    word-break: break-all;
+    line-height: 1.2;
+    font-family: inherit;
+    /* position: absolute; */
+    box-sizing: border-box;
+    color: #333;
+}
+
+swan-textarea .textarea-placeholder {
+    color: #ccc;
+    margin-top: 1px;
+}
+
+swan-textarea[auto-height="true"] {
+    height: auto;
+}
+
+swan-textarea[auto-height="true"] .swan-textarea-main {
+    min-height: 20px;
+}
+
+swan-textarea[auto-height="false"] {}

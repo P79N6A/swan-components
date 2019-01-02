@@ -1,12 +1,4 @@
 /**
-* @license
-* Copyright Baidu Inc. All Rights Reserved.
-*
-* This source code is licensed under the Apache License, Version 2.0; found in the
-* LICENSE file in the root directory of this source tree.
-*/
-
-/**
  * @file bdml's file's base elements <checkbox-group>
  * @author lijiahui(lijiahui02@baidu.com)
  *
@@ -26,6 +18,7 @@ export default {
     constructor(props) {
         this.detail = [];
         this.childList = [];
+        this.name = this.data.get('name');
         this.messages = {
             'checkbox-item-change': $event => {
                 let object = $event.value;
@@ -45,6 +38,13 @@ export default {
                 this.changeCheckbox(object);
             }
         };
+    },
+
+    attached() {
+        this.watch('name', name => {
+            this.reRegisterFormItem(this.name);
+            this.name = name;
+        });
     },
 
     /**

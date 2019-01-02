@@ -1,16 +1,9 @@
 /**
-* @license
-* Copyright Baidu Inc. All Rights Reserved.
-*
-* This source code is licensed under the Apache License, Version 2.0; found in the
-* LICENSE file in the root directory of this source tree.
-*/
-
-/**
  * @file bdml's file's icon elements <label>
  * @author hzz780(huangzongzhe@baidu.com)
  *         jiamiao(jiamiao@baidu.com)
  */
+import {internalDataComputedCreator, typesCast} from '../computedCreator';
 
 // label支持绑定的控件
 const labelTargetTag = ['SWAN-BUTTON', 'SWAN-CHECKBOX', 'SWAN-RADIO', 'SWAN-SWITCH'];
@@ -20,7 +13,7 @@ export default {
     behaviors: ['noNativeBehavior', 'animateEffect', 'userTouchEvents'],
 
     template: `<swan-label
-            class="{{privateClass}}"
+            class="{{__privateClass}}"
             on-click="labelClick($event)"
             for="{{for}}"
         >
@@ -33,6 +26,12 @@ export default {
             hoverStopPropagation: false,
             dataFor: ''
         };
+    },
+
+    computed: {
+        ...internalDataComputedCreator([
+            {name: 'privateClass', caster: typesCast.stringCast}
+        ])
     },
 
     /**

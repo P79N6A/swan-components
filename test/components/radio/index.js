@@ -1,12 +1,4 @@
 /**
-* @license
-* Copyright Baidu Inc. All Rights Reserved.
-*
-* This source code is licensed under the Apache License, Version 2.0; found in the
-* LICENSE file in the root directory of this source tree.
-*/
-
-/**
  * @file radio组件单测
  * @author  yanghuabei@baidu.com
  *          mabin03@baidu.com
@@ -133,7 +125,7 @@ describe(`component [${COMPONENT_NAME}]`, () => {
                         target: component.id
                     }
                 });
-                expect(component.data.get('checked')).toBe(true);
+                expect(component.data.get('__checked')).toBe(true);
                 done();
             });
         });
@@ -147,7 +139,7 @@ describe(`component [${COMPONENT_NAME}]`, () => {
                         target: component.id
                     }
                 });
-                expect(component.data.get('checked')).toBe(true);
+                expect(component.data.get('__checked')).toBe(true);
                 done();
             });
         });
@@ -157,7 +149,7 @@ describe(`component [${COMPONENT_NAME}]`, () => {
             component.radioGroup = {
                 id
             };
-            const checked = component.data.get('checked');
+            const checked = component.data.get('__checked');
             const newRadio = buildComponent(COMPONENT_NAME, Radio);
             attach2Document(newRadio);
             newRadio.radioGroup = {
@@ -171,7 +163,7 @@ describe(`component [${COMPONENT_NAME}]`, () => {
                     }
                 });
                 component.nextTick(() => {
-                    expect(component.data.get('checked')).toBe(!checked);
+                    expect(component.data.get('__checked')).toBe(!checked);
                     done();
                     newRadio.dispose();
                 });
@@ -231,7 +223,7 @@ describe(`component [${COMPONENT_NAME}]`, () => {
         it('resetFormValue should set checked to be true/false', done => {
             component.resetFormValue();
             component.nextTick(() => {
-                const actual = component.data.get('checked');
+                const actual = component.data.get('__checked');
                 const expected = false;
                 expect(actual).toBe(expected);
                 done();
@@ -250,7 +242,7 @@ describe(`component [${COMPONENT_NAME}]`, () => {
             const event = new Event('click');
             newRadio.el.dispatchEvent(event);
             newRadio.nextTick(() => {
-                expect(newRadio.data.get('checked')).toBe(!checked);
+                expect(newRadio.data.get('__checked')).toBe(!checked);
                 done();
                 newRadio.dispose();
             });
@@ -268,7 +260,7 @@ describe(`component [${COMPONENT_NAME}]`, () => {
             attach2Document(newRadio);
             newRadio.radioTap();
             newRadio.nextTick(() => {
-                const actual = newRadio.data.get('checked');
+                const actual = newRadio.data.get('__checked');
                 expect(actual).toBe(checked);
                 done();
                 newRadio.dispose();

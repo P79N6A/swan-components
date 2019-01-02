@@ -1,21 +1,15 @@
 /**
-* @license
-* Copyright Baidu Inc. All Rights Reserved.
-*
-* This source code is licensed under the Apache License, Version 2.0; found in the
-* LICENSE file in the root directory of this source tree.
-*/
-
-/**
  * @file swan xml querySelector operation
  * @author yican(yangtianyi01@baidu.com)
  */
 
 import {NodeRefOperation} from './nodeRefOperation';
+import {convertToCustomComponentSelector} from './parseDataUtil';
 
 let execId = 0;
 
-export class SelectorOperation {
+let selectionInstanceMap = {};
+class SelectorOperation {
 
     constructor(slaveId, communicator) {
         this.component = '';
@@ -27,6 +21,7 @@ export class SelectorOperation {
         this.communicator = communicator;
         this.execCallback = {};
         this.contextId = null;
+        this.componentName = '';
     }
 
     /**
@@ -35,7 +30,9 @@ export class SelectorOperation {
      * @param  {[type]} el       [element]
      * @return {[type]}          [The element found, if any]
      */
-    select(selector, el = document) {
+    select(selector) {
+        // 如果实例中有contextId就是在自定义组件中，为了区分class生效的域，给自定义组件里的class加了前缀，这里兼容，下同
+        selector = this.contextId ? convertToCustomComponentSelector(selector, this.componentName) : selector;
         this.nodeRef = new NodeRefOperation(selector, this.slaveId, this);
         this.nodeRef.queryType = 'select';
         return this.nodeRef;
@@ -47,7 +44,8 @@ export class SelectorOperation {
      * @param  {[type]} el       [ element]
      * @return {[type]}          [description]
      */
-    selectAll(selector, el = document) {
+    selectAll(selector) {
+        selector = this.contextId ? convertToCustomComponentSelector(selector, this.componentName) : selector;
         this.nodeRef = new NodeRefOperation(selector, this.slaveId, this);
         this.nodeRef.queryType = 'selectAll';
         return this.nodeRef;
@@ -64,7 +62,14 @@ export class SelectorOperation {
     // }
 
     exec(cb) {
+        const context = this;
+        // 通过execId来保存至map中，在slave传回dom的相关属性后，通过execId来找回是哪一个实例
         execId++;
+        selectionInstanceMap[execId] = {
+            queueCb: context.queueCb,
+            execCallback: context.execCallback
+        };
+
         if (Object.prototype.toString.call(cb).indexOf('Function') > -1) {
             this.execCallback[execId] = {cb: cb, resultArray: []};
         }
@@ -87,9 +92,16 @@ export class SelectorOperation {
 
     in(component) {
         this.contextId = component.nodeId;
+        this.component = component;
+        this.componentName = component.componentName;
         return this;
     }
 
+    /**
+     * 把需要计算的数据丢给slave，master上拿不到dom的相关数据
+     *
+     * @param {Object} obj - 用到querySelect的相关数据
+     */
     _querySlaveSelector({slaveId, selector, queryType, index, operation, fields, execId}) {
         this.communicator.sendMessage(
             slaveId,
@@ -109,3 +121,32 @@ export class SelectorOperation {
 
     }
 }
+
+/**
+ * 初始化selector生成器
+ *
+ * @param {Object} communicator - 监听的事件流对象
+ * @return {Function} 创建selector的生成器
+ */
+export const initSelectorQuery = communicator => {
+    // 接收从slave传回的dom的相关数据，通过上面维护的map和execId来找到对应回调
+    communicator.onMessage('getSlaveSelector', params => {
+        const {slaveId, value} = params;
+        const paramsValue = JSON.parse(value);
+        const {index, data, execId} = paramsValue;
+        let selection = selectionInstanceMap[execId];
+        if (selection) {
+            selection.queueCb[index] && selection.queueCb[index](data);
+            // exec callback
+            let execCallbackInfo = selection.execCallback[execId];
+            if (execCallbackInfo) {
+                execCallbackInfo.resultArray[index] = paramsValue.data;
+                let currentResultArraySize = execCallbackInfo.resultArray.filter(info => info !== undefined).length;
+                if (currentResultArraySize === selection.queueCb.length) {
+                    execCallbackInfo.cb.apply(null, [execCallbackInfo.resultArray]);
+                }
+            }
+        }
+    });
+    return slaveId => new SelectorOperation(slaveId, communicator);
+};

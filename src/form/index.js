@@ -1,18 +1,9 @@
 /**
-* @license
-* Copyright Baidu Inc. All Rights Reserved.
-*
-* This source code is licensed under the Apache License, Version 2.0; found in the
-* LICENSE file in the root directory of this source tree.
-*/
-
-/**
  * @file bdml's file's base elements <form>
- * @author jianglian(jianglian01@baidu.com)
- *          houyu(houyu01@baidu.com)
- *          sunbaixin(sunbaixin@baidu.com)
+ * @author zengqingzhuang(zengqingzhuang@baidu.com)
  */
-import {attrValBool} from '../utils';
+import {datasetFilter} from '../utils';
+import {internalDataComputedCreator, typesCast} from '../computedCreator';
 export default {
 
     behaviors: ['userTouchEvents', 'noNativeBehavior'],
@@ -25,15 +16,20 @@ export default {
             reportSubmit: false
         };
     },
+
+    computed: {
+        ...internalDataComputedCreator([
+            {name: 'reportSubmit', caster: typesCast.boolCast}
+        ])
+    },
+
     template: `<swan-form>
         <slot></slot>
     </swan-form>`,
 
     messages: {
         'form:register'({value: {target, name}}) {
-            if (name) {
-                this.formChilds.push({target, name});
-            }
+            this.formChilds.push({target, name});
         },
 
         'form:unregister'({value: {target, name}}) {
@@ -50,15 +46,16 @@ export default {
     },
 
     submitHandler(args) {
-        const formParams = this.formChilds.reduce((formParams, item, index) => {
-            if (item.target.getFormValue) {
+        const formParams = this.formChilds.reduce((formParams, item) => {
+            if (item.target.getFormValue && item.name) {
                 formParams[item.name] = item.target.getFormValue();
             }
             return formParams;
         }, {});
-        let srcElement = args.target.el;
+        let srcTarget = args.target;
+        let srcElement = srcTarget.el;
         let target = {
-            dataset: srcElement.dataset,
+            dataset: datasetFilter(srcTarget.data.raw),
             id: srcElement.id,
             offsetLeft: srcElement.offsetLeft,
             offsetTop: srcElement.offsetTop
@@ -67,7 +64,7 @@ export default {
             target,
             value: formParams
         };
-        if (attrValBool(this.data.get('reportSubmit'))) {
+        if (this.data.get('__reportSubmit')) {
             // 创建二级回调的函数名及函数体
             this.callbackName = `formCallback_${new Date() - 0}_${this.id || ''}`;
             global[this.callbackName] = args => this.formCallback.call(this, detail, args);

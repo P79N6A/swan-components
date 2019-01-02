@@ -1,18 +1,12 @@
 /**
-* @license
-* Copyright Baidu Inc. All Rights Reserved.
-*
-* This source code is licensed under the Apache License, Version 2.0; found in the
-* LICENSE file in the root directory of this source tree.
-*/
-
-/**
  * @file slider组件单测
  * @author yanghuabei@baidu.com
  */
 
 import Slider from '../../../src/slider';
+import View from '../../../src/view/index';
 import buildComponent from '../../mock/swan-core/build-component';
+import {getComponentClass, getFactory} from '../../mock/swan-core/build-component';
 import componentBaseFieldCheck from '../../utils/component-base-field-check';
 import attach2Document from '../../utils/attach-to-document';
 import {createSingleTouchEvent} from '../../utils/touch';
@@ -94,6 +88,59 @@ describe(`component [${COMPONENT_NAME}]`, () => {
                 const data = component.data;
                 const pageX = targetElement.offsetLeft;
                 const pageY = targetElement.offsetTop;
+
+                const wrapperWidth = targetElement.clientWidth;
+                const stepDistance = wrapperWidth / data.get('max');
+                const movePageX = pageX + stepDistance * 2;
+
+
+                createSingleTouchEvent(sliderElement, [{x: pageX, y: pageY}, {x: movePageX, y: pageY}]).then(() => {
+                    expect(data.get('value')).toBe(2);
+                    done();
+                }).catch(() => {
+                    done();
+                });
+            });
+        });
+
+        describe('check touch events under position: relative; element', () => {
+            const componentView = getComponentClass('view', View);
+            const componentSlider = getComponentClass('slider', Slider);
+            const factory = getFactory();
+            const properties = {
+                classProperties: {
+                    components: {
+                        view: componentView,
+                        slider: componentSlider
+                    }
+                }
+            };
+
+            factory.componentDefine(
+                'swan-slider',
+                {
+                    template: `
+                    <swan-page>
+                        <view style="position: relative; margin-left: 40px;">
+                            <slider s-ref='slider'>
+                            </slider>
+                        </view>
+                    </swan-page>
+                    `
+                },
+                properties
+            );
+            const TestView = factory.getComponents('swan-slider');
+            const testview = new TestView();
+            testview.attach(document.body);
+            const sliderComp = testview.ref('slider');
+            const sliderElement = sliderComp.el.querySelector('.swan-slider-handle');
+            const targetElement = sliderComp.el.querySelector('.swan-slider-tap-area');
+
+            it('should fire changing event on touchmove, fire change on touchend with right args', done => {
+                const data = sliderComp.data;
+                const pageX = targetElement.getBoundingClientRect().left;
+                const pageY = targetElement.getBoundingClientRect().top;
 
                 const wrapperWidth = targetElement.clientWidth;
                 const stepDistance = wrapperWidth / data.get('max');

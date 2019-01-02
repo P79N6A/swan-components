@@ -1,41 +1,49 @@
-/**
-* @license
-* Copyright Baidu Inc. All Rights Reserved.
-*
-* This source code is licensed under the Apache License, Version 2.0; found in the
-* LICENSE file in the root directory of this source tree.
-*/
-
 import { rejects } from "assert";
 
 export const boxjsDataGetMock = {
     'swan-slaveIdSync': { slaveId: '1' },
+    'swan-appInfoSync': {appId: 'appId'},
 };
 export const boxjsDataGetAsyncMock = {
     'swan-privateGetUserInfo': Promise.resolve({}),
+    'swan-privateGetUserInfo-unLogined': Promise.resolve({}),
     'swan-appInfoSync': Promise.resolve({}),
     'swan-regionData': Promise.resolve({content: [
         {
-            code: 1,
-            name: 'A',
+            code: '11',
+            name: '北京市',
             children: [
                 {
-                    code: 11,
-                    name: 'a',
+                    code: '1101',
+                    name: '市辖区',
                     children: [
                         {
-                            code: 111,
-                            name: 'aa'
+                            code: '110101',
+                            name: '东城区'
+                        },
+                        {
+                            name: "西城区",
+                            code: "110102"
                         }
                     ]
-                },
+                }
+            ]
+        },
+        {
+            code: '12',
+            name: '天津市',
+            children: [
                 {
-                    code: 12,
-                    name: 'b',
+                    code: '1201',
+                    name: '市辖区',
                     children: [
                         {
-                            code: 121,
-                            name: 'bb'
+                            code: '120101',
+                            name: '和平区'
+                        },
+                        {
+                            name: "河东区",
+                            code: "120102"
                         }
                     ]
                 }
@@ -48,12 +56,17 @@ export const boxjsDataGetAsyncMock = {
 export const boxjsDataGetCallbackMock = {
     'swan-privateGetUserInfo': {
         status: 0,
-        message:'调起成功',
-        data:{
-            "displayname":"测试用户",
-            "portrait" : "https://xxxx.png",
-            "gender" : "1"
+        message: '调起成功',
+        data: {
+            displayname: '测试用户',
+            portrait: 'https://xxxx.png',
+            gender: '1'
         }
+    },
+    'swan-privateGetUserInfo-unLogined': {
+        status: 1,
+        message: '调起成功',
+        data: {}
     },
     'swan-phoneNumber': {
         status: 0,
@@ -71,13 +84,6 @@ export const boxjsDataGetCallbackMock = {
             data: {
                 formId: 111
             }
-        }
-    },
-    'swan-setting': {
-        status: 0,
-        message: '',
-        data: {
-            mapp_camera: '1'
         }
     }
 }
@@ -217,6 +223,25 @@ export const boxjsUiMock = {
             value:'1'
         },
         rej: { status: 202, message: '解析失败，请检查参数是否正确' }
+    },
+    'swan-setting': {
+        res: {
+            status: 0,
+            message: '',
+            data: {
+                mapp_camera: '1'
+            }
+        },
+        rej: {status: 202, message: '解析失败，请检查参数是否正确'}
+    },
+    'swan-IM': {
+        res: {
+            status: 0,
+            message: '',
+            data: {
+            }
+        },
+        rej: {status: 202, message: '解析失败，请检查参数是否正确'}
     }
 }
 export const boxjsDeviceMock = {

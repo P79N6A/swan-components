@@ -1,11 +1,3 @@
-/**
-* @license
-* Copyright Baidu Inc. All Rights Reserved.
-*
-* This source code is licensed under the Apache License, Version 2.0; found in the
-* LICENSE file in the root directory of this source tree.
-*/
-
 import sinon from 'sinon';
 import checkbox from '../../../src/checkbox/index';
 import buildComponent from '../../mock/swan-core/build-component';
@@ -108,7 +100,7 @@ describe('component [' + COMPONENT_NAME + ']', () => {
                 });
 
                 component.nextTick(() => {
-                    expect(component.data.get('checked')).toBe(false);
+                    expect(component.data.get('__checked')).toBe(false);
                     done();
                 });
             });
@@ -117,10 +109,10 @@ describe('component [' + COMPONENT_NAME + ']', () => {
 
         describe('onClick method', () => {
             it('should set checked to be true if previous is false', done => {
-                expect(component.data.get('checked')).toBe(false);
+                expect(component.data.get('__checked')).toBe(false);
                 component.onClick();
                 component.nextTick(() => {
-                    const actual = component.data.get('checked');
+                    const actual = component.data.get('__checked');
                     const expected = true;
                     expect(actual).toBe(expected);
                     done();
@@ -128,12 +120,12 @@ describe('component [' + COMPONENT_NAME + ']', () => {
             });
 
             it('should not change checked to be true if disabled', done => {
-                expect(component.data.get('checked')).toBe(false);
+                expect(component.data.get('__checked')).toBe(false);
                 component.data.set('disabled', true);
                 component.nextTick(() => {
                     component.onClick();
                     component.nextTick(() => {
-                        const actual = component.data.get('checked');
+                        const actual = component.data.get('__checked');
                         const expected = false;
                         expect(actual).toBe(expected);
                         done();

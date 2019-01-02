@@ -1,12 +1,4 @@
 /**
-* @license
-* Copyright Baidu Inc. All Rights Reserved.
-*
-* This source code is licensed under the Apache License, Version 2.0; found in the
-* LICENSE file in the root directory of this source tree.
-*/
-
-/**
  * @file path路径相关的工具集
  * @author houyu(houyu01@baidu.com)
  */
@@ -41,7 +33,7 @@ export const pathResolver = (originPath, path, errorCb) => {
 export const absolutePathResolver = (basePath, pagePath, path) => {
     // 开发者工具的地址无需转换
     if (window.navigator.userAgent.toLowerCase().indexOf('swandevtools') > 0
-        && path.indexOf('swan-ide-gui/swan') > 0) {
+        && path.indexOf('百度开发者工具/swan/file') > 0) {
         return path;
     }
     // 远程地址无需转换

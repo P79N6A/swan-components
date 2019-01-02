@@ -1,11 +1,3 @@
-/**
-* @license
-* Copyright Baidu Inc. All Rights Reserved.
-*
-* This source code is licensed under the Apache License, Version 2.0; found in the
-* LICENSE file in the root directory of this source tree.
-*/
-
 import sinon from 'sinon';
 import text from '../../../src/text/index';
 import buildComponent from '../../mock/swan-core/build-component';
@@ -37,7 +29,7 @@ describe('component [' + COMPONENT_NAME + '] with init data', () => {
             space: 'ensp'
         }
     });
-    const $component = attach2Document(component);    
+    const $component = attach2Document(component);
     it('should has init data', () => {
         const $swanText = $component.querySelector('.text-selectable');
         expect($swanText).not.toBe(null);
@@ -53,7 +45,7 @@ describe('component [' + COMPONENT_NAME + ']', () => {
             template: `
             <view>
                 <text s-ref="component">{{test}}</text>
-            </view>    
+            </view>
             `,
             initData() {
                 return {
@@ -72,16 +64,18 @@ describe('component [' + COMPONENT_NAME + ']', () => {
     const TestView = factory.getComponents('test-text');
     const testview = new TestView();
     attach2Document(testview);
-    it ('should update showText while slot change', done => {
+    it('should update showText while slot change', done => {
         expect(testview.ref('component').ref('showText').innerHTML).toBe('a');
         testview.ref('component');
         testview.data.set('test', 'b');
-        testview.ref('component').communicator.fireMessage({
-            type: 'slaveUpdated'
-        });
         testview.nextTick(() => {
-            expect(testview.ref('component').ref('showText').innerHTML).toBe('b');
-            done();
+            testview.ref('component').communicator.fireMessage({
+                type: 'slaveUpdated'
+            });
+            testview.nextTick(() => {
+                expect(testview.ref('component').ref('showText').innerHTML).toBe('b');
+                done();
+            });
         });
     });
 });

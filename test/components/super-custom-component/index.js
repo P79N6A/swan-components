@@ -1,11 +1,3 @@
-/**
-* @license
-* Copyright Baidu Inc. All Rights Reserved.
-*
-* This source code is licensed under the Apache License, Version 2.0; found in the
-* LICENSE file in the root directory of this source tree.
-*/
-
 import superCustomComponent from '../../../src/super-custom-component';
 import view from '../../../src/view';
 import buildComponent from '../../mock/swan-core/build-component';
@@ -56,29 +48,60 @@ describe('component [' + COMPONENT_NAME + ']', () => {
                 }
             }
         });
+        
         expect(cus.data.get('a')).toBe(0);
+        cus.data.set('a', 1);
+        expect(cus.data.get('a')).toBe(1);
     });
     it('should handle setCustomComponentData message', () => {
         cus.communicator.fireMessage({
             type: 'setCustomComponentData',
-            options: {
-                nodeId: cusUid
-            },
-            setObject: {
-                b: 1
-            }
+            operationSet: [{
+                options: {
+                    nodeId: cusUid
+                },
+                setObject: {
+                    b: 1
+                }
+            }]
         })
         expect(cus.data.get('b')).toBe(1);
     });
-    it('should handle triggerEvents message', () => {
+    it('should handle customComponentInnerBehavior message', () => {
+        cus.communicator.fireMessage({
+            type: 'customComponentInnerBehavior',
+            nodeId: cusUid,
+            extraMessage: {
+                eventType: 'insertFormField'
+            }
+        });
+        const actual = typeof cus['insertFormField'];
+        const expected = 'function';
+        expect(actual).toBe(expected);
+    });
+    it('should handle triggerEvents message, its type is not object', () => {
         const spy = sinon.spy(cus, 'fire');
         cus.communicator.fireMessage({
             type: 'triggerEvents',
             nodeId: cusUid,
             eventName: 'test',
-            eventDetail: '1'
-        })
-        expect(spy.calledOnceWith('bindtest', '1')).toBe(true);
+            eventData: '1'
+        });
+        expect(spy.calledOnceWith('bindtest', sinon.match.has('detail', '1'))).toBe(true);
+        spy.restore();
+    });
+    it('should handle triggerEvents message, its type is object', () => {
+        const spy = sinon.spy(cus, 'fire');
+        cus.communicator.fireMessage({
+            type: 'triggerEvents',
+            nodeId: cusUid,
+            eventName: 'test',
+            eventData: {
+                test: '1'
+            }
+        });
+
+        expect(spy.calledOnceWith('bindtest', sinon.match.has('test', '1'))).toBe(true);
         spy.restore();
     });
     afterAll(() => {

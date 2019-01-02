@@ -1,12 +1,4 @@
 /**
-* @license
-* Copyright Baidu Inc. All Rights Reserved.
-*
-* This source code is licensed under the Apache License, Version 2.0; found in the
-* LICENSE file in the root directory of this source tree.
-*/
-
-/**
  * @file web-view组件单测
  * @author yanghuabei@baidu.com
  */
@@ -82,7 +74,7 @@ describe(`component [${COMPONENT_NAME}]`, () => {
                 const scrollTopChangedSpy = sinon.spy(component, 'scrollTopChanged');
                 component.data.set('scrollTop', 1);
                 component.nextTick(() => {
-                    expect(scrollTopChangedSpy.calledOnceWith(1)).toBe(true);
+                    expect(scrollTopChangedSpy.calledOnce).toBe(true);
                     scrollTopChangedSpy.restore();
                     done();
                 });
@@ -92,7 +84,7 @@ describe(`component [${COMPONENT_NAME}]`, () => {
                 const scrollLeftChangedSpy = sinon.spy(component, 'scrollLeftChanged');
                 component.data.set('scrollLeft', 1);
                 component.nextTick(() => {
-                    expect(scrollLeftChangedSpy.calledOnceWith(1)).toBe(true);
+                    expect(scrollLeftChangedSpy.calledOnce).toBe(true);
                     scrollLeftChangedSpy.restore();
                     done();
                 });
@@ -184,11 +176,11 @@ describe(`component [${COMPONENT_NAME}]`, () => {
                     });
                 });
 
-                it('should fire bindscroll event and imgLazyLoad message when scrolled', () => {
+                it('should fire bindscroll event and componentScroll message when scrolled', () => {
                     const listener = sinon.spy();
                     const lazyLoadListener = sinon.spy();
                     scrollView.on('bindscroll', listener);
-                    scrollView.communicator.onMessage('imgLazyLoad', lazyLoadListener);
+                    scrollView.communicator.onMessage('componentScroll', lazyLoadListener);
                     scrollView.main.dispatchEvent(new UIEvent('scroll'));
 
                     const expectedDeltaX = -50;

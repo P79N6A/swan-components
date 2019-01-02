@@ -1,12 +1,4 @@
 /**
-* @license
-* Copyright Baidu Inc. All Rights Reserved.
-*
-* This source code is licensed under the Apache License, Version 2.0; found in the
-* LICENSE file in the root directory of this source tree.
-*/
-
-/**
  * @file karma配置文件
  * @author liuyuekeng@baidu.com
  */
@@ -21,19 +13,30 @@ module.exports = function (config) {
         colors: true,
         autoWatch: true,
         files: [
+            './components/animation-view/*.js',
+            './components/ar-camera/*.js',
             './components/audio/*.js',
             './components/button/*.js',
+            './components/camera/*.js',
+            './components/canvas/*.js',
             './components/checkbox/*.js',
             './components/checkbox-group/*.js',
+            './components/cover-image/*.js',
+            './components/cover-view/*.js',
             './components/form/*.js',
             './components/icon/*.js',
             './components/image/*.js',
             './components/input/*.js',
             './components/label/*.js',
+            './components/live-player/*.js',
+            './components/map/*.js',
             './components/mask/*.js',
             './components/movable-area/*.js',
             './components/movable-view/*.js',
+            './components/navigator/*.js',
+            './components/open-data/*.js',
             './components/page/*.js',
+            './components/picker/*.js',
             './components/picker-view/*.js',
             './components/picker-view-column/*.js',
             './components/progress/*.js',
@@ -48,7 +51,10 @@ module.exports = function (config) {
             './components/swiper-item/*.js',
             './components/switch/*.js',
             './components/text/*.js',
+            './components/textarea/*.js',
+            './components/video/*.js',
             './components/view/*.js',
+            './components/web-view/*.js'
         ],
         preprocessors: {
             '../test/**/*.js': ['webpack']

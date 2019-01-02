@@ -1,12 +1,4 @@
 /**
-* @license
-* Copyright Baidu Inc. All Rights Reserved.
-*
-* This source code is licensed under the Apache License, Version 2.0; found in the
-* LICENSE file in the root directory of this source tree.
-*/
-
-/**
  * @file swan's file's base elements
  * @author houyu(houyu01@baidu.com)
  */
@@ -37,7 +29,6 @@ import Checkbox from './checkbox';
 import CheckboxGroup from './checkbox-group';
 import LivePlayer from './live-player';
 import Video from './video';
-import VideoExt from './video/android';
 import Radio from './radio';
 import RadioGroup from './radio-group';
 import Switch from './switch';
@@ -86,8 +77,7 @@ export const getComponents = environment => {
         'checkbox': Checkbox,
         'checkbox-group': CheckboxGroup,
         'live-player': LivePlayer,
-        'video': (environment.versionCompare(environment.boxVersion(), '10.8.5') < 0 && !environment.isIOS)
-                ? VideoExt : Video,
+        'video': Video,
         'radio': Radio,
         'radio-group': RadioGroup,
         'switch': Switch,

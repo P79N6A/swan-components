@@ -1,11 +1,3 @@
-/**
-* @license
-* Copyright Baidu Inc. All Rights Reserved.
-*
-* This source code is licensed under the Apache License, Version 2.0; found in the
-* LICENSE file in the root directory of this source tree.
-*/
-
 import swiperItem from '../../../src/swiper-item/index';
 import attach2Document from '../../utils/attach-to-document';
 import buildComponent from '../../mock/swan-core/build-component';

@@ -1,12 +1,4 @@
 /**
-* @license
-* Copyright Baidu Inc. All Rights Reserved.
-*
-* This source code is licensed under the Apache License, Version 2.0; found in the
-* LICENSE file in the root directory of this source tree.
-*/
-
-/**
  * @file 描述用户动画的文件
  * @author houyu(houyu01@baidu.com)
  */
@@ -70,6 +62,7 @@ class Animation {
 
     step(additionalConfiguration = {}) {
         this.commandSetQueue.push({...this.currentCommandSet, additionalConfiguration});
+        return this;
     }
 
     export() {
@@ -151,12 +144,12 @@ const convertStep2Styles = ({commandSetQueue, configuration}) => {
         .filter(commandKey => currentCommandSet[commandKey].type === 'normal')
         .map(commandKey => {
             const originValue = currentCommandSet[commandKey].rule.value;
-            const proccessedValue = animateProperReflection[commandKey]
+            const processedValue = animateProperReflection[commandKey]
                                     ? animateProperReflection[commandKey](originValue)
                                     : originValue;
             return {
                 property: currentCommandSet[commandKey].rule.property,
-                value: proccessedValue
+                value: processedValue
             };
         })
         .concat([{

@@ -1,24 +1,16 @@
 /**
-* @license
-* Copyright Baidu Inc. All Rights Reserved.
-*
-* This source code is licensed under the Apache License, Version 2.0; found in the
-* LICENSE file in the root directory of this source tree.
-*/
-
-/**
  * @file utils for swan
  * @author houyu(houyu01@baidu.com)
  */
 import {Data} from './data';
 import EnviromentEvent from './enviroment-event';
 export {Data, EnviromentEvent};
-export {hexColor} from './style';
-export {computedStyle, getTransitionParams} from './style';
+export * from './style';
 export {formatTime} from './date';
 export * from './path';
 export {privateKey} from './private-key';
 export {eventProccesser} from './event';
+export {COMPONENT_STATE} from './constant';
 
 /**
  * 判断Val的真假并非以普适性原则，如果设定了属性，但是没有给其Boolean的值，也被视为真
@@ -38,6 +30,8 @@ export const datasetFilter = raw => {
     }
     return dataset;
 };
+
+export const convertToCamelCase = str => str.replace(/\-([a-z])/g, (all, first) => first.toUpperCase());
 
 export const sanComponentWalker = target => {
     if (target.sanComponent || target.tagName.toLowerCase() === 'body') {
@@ -191,4 +185,8 @@ export const isNum = val => {
 
 export const isBool = val => {
     return true === val || false === val || '[object Boolean]' === Object.prototype.toString.call(val);
+};
+
+export const isNaN = val => {
+    return 'number' === typeof val && val !== val;
 };

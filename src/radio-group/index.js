@@ -1,12 +1,4 @@
 /**
-* @license
-* Copyright Baidu Inc. All Rights Reserved.
-*
-* This source code is licensed under the Apache License, Version 2.0; found in the
-* LICENSE file in the root directory of this source tree.
-*/
-
-/**
  * @file bdml's file's base elements <radio-group>
  * @author mabin(mabin03@baidu.com)
  */
@@ -29,6 +21,15 @@ export default {
 
         // 用来记录被选中的 RadioValue
         this.value = '';
+
+        this.name = this.data.get('name');
+    },
+
+    attached() {
+        this.watch('name', name => {
+            this.reRegisterFormItem(this.name);
+            this.name = name;
+        });
     },
 
     initData() {

@@ -1,12 +1,4 @@
 /**
-* @license
-* Copyright Baidu Inc. All Rights Reserved.
-*
-* This source code is licensed under the Apache License, Version 2.0; found in the
-* LICENSE file in the root directory of this source tree.
-*/
-
-/**
  * @file bdml's file's base elements <progress>
  * @author qiaolin(qiaolin@baidu.com)
  *         lijiahui(lijiahui02@baidu.com)
@@ -14,7 +6,7 @@
  * @date 2018/6/5
  */
 import style from './index.css';
-import {attrValBool} from '../utils';
+import {internalDataComputedCreator, typesCast} from '../computedCreator';
 
 export default {
 
@@ -35,6 +27,14 @@ export default {
         };
     },
 
+    computed: {
+        ...internalDataComputedCreator([
+            {name: 'showInfo', caster: typesCast.boolCast},
+            {name: 'active', caster: typesCast.boolCast},
+            {name: 'activeMode', data: ['backwards', 'forwards']}
+        ])
+    },
+
     template: `<swan-progress>
         <div class="${style['progress-bar']}"
         showInfo="{{showInfo}}"
@@ -45,30 +45,39 @@ export default {
             style="height:{{strokeWidth + 'px'}};
             width:{{width}};background-color:{{activeColor || color}};{{animationStyle}}"></div>
         </div>
-        <div style="{{showInfo && showInfo !== 'false' ? '' : 'display:none;'}}"
+        <div style="{{__showInfo && __showInfo !== 'false' ? '' : 'display:none;'}}"
             class="${style['progress-info']}">
             {{percent + '%'}}
         </div>
         </swan-progress>`,
 
     attached() {
-        let boolActive = attrValBool(this.data.get('active'));
+        let boolActive = this.data.get('__active');
         this.percentChange(this.data.get('percent'), boolActive);
-        this.watch('percent', val => {
-            // 重置progress宽度进行动画
-            this.data.set('animationStyle', '');
-            // 上一次的percent值
-            const prePercent = parseInt(this.data.get('width').slice(0, -1), 10);
-            // 当前的percent值
-            const currentPercent = this.data.get('percent');
-            // 若activeMode设置为forwards且当前改变的值比上一次的值小，则没有动画，直接返回到当前的数值，只有大于时才有动画
-            const isNeedActive = this.data.get('activeMode') === 'forwards' ? currentPercent > prePercent : true;
-            // 只有当activeMode为backwards时，每次变动要重置进度条从0开始
-            if (this.data.get('activeMode') === 'backwards') {
-                this.data.set('width', 0 + '%');
-            }
-            this.percentChange(val, boolActive && isNeedActive);
+        const beWatchedParams = ['percent', 'active'];
+        beWatchedParams.forEach(param => {
+            this.watch(param, val => {
+                this.resetBeforeParamChange();
+            });
         });
+    },
+
+    resetBeforeParamChange() {
+        let boolActive = this.data.get('__active');
+        let percent = this.data.get('percent');
+        // 重置progress宽度进行动画
+        this.data.set('animationStyle', '');
+        // 上一次的percent值
+        const prePercent = parseInt(this.data.get('width').slice(0, -1), 10);
+        // 当前的percent值
+        const currentPercent = this.data.get('percent');
+        // 若activeMode设置为forwards且当前改变的值比上一次的值小，则没有动画，直接返回到当前的数值，只有大于时才有动画
+        const isNeedActive = this.data.get('__activeMode') === 'forwards' ? currentPercent > prePercent : true;
+        // 只有当activeMode为backwards时，每次变动要重置进度条从0开始
+        if (this.data.get('__activeMode') === 'backwards') {
+            this.data.set('width', 0 + '%');
+        }
+        this.percentChange(percent, boolActive && isNeedActive);
     },
 
     /**

@@ -1,16 +1,8 @@
 /**
-* @license
-* Copyright Baidu Inc. All Rights Reserved.
-*
-* This source code is licensed under the Apache License, Version 2.0; found in the
-* LICENSE file in the root directory of this source tree.
-*/
-
-/**
  * @file XML返回数据处理工具
  * @author liangshiquan
  */
-import {datasetFilter} from '../../index'
+import {datasetFilter} from '../../../utils';
 
 const WHITE_LIST_SCROLL_VIEW = '.scroll-view-compute-offset';
 
@@ -22,6 +14,66 @@ function isScrollView(selectDom) {
 function isBody(selectDom) {
     return selectDom.tagName === 'BODY';
 }
+
+/**
+ * 读取 DOMRect 中的数据
+ *
+ * @param  {DOMRect} domRect DOMRect
+ * @return {Object}
+ */
+export const readBoxData = domRect => {
+    return {
+        top: domRect.top,
+        right: domRect.right,
+        bottom: domRect.bottom,
+        left: domRect.left
+    };
+};
+
+/**
+ * 读取 DOMRect 中的数据
+ *
+ * @param  {DOMRect} domRect DOMRect
+ * @return {Object}
+ */
+export const readRectData = domRect => {
+    return {
+        top: domRect.top,
+        right: domRect.right,
+        bottom: domRect.bottom,
+        left: domRect.left,
+        width: domRect.width,
+        height: domRect.height
+    };
+};
+
+/**
+ * 获取 dom 节点的 dataset
+ *
+ * @param  {HTMLElement} node dom 节点
+ * @return {Object}
+ */
+export const getDataSet = node => (node.sanComponent
+    && node.sanComponent.data.raw
+    && datasetFilter(node.sanComponent.data.raw)) || {};
+
+
+/**
+ * 将选择器转为自定义组件的选择器
+ * 主要对 class 增加 custom-component__ 前缀
+ *
+ * @param  {string} selector 选择器
+ * @param  {string} customName 自定义组件名称
+ * @return {string}          自定义组件的选择器
+ */
+export const convertToCustomComponentSelector = (selector, componentName) => {
+    const selectorList = selector.split(' ');
+    selectorList.forEach((selector, index) => {
+        /^\./.test(selector) && !selector.startsWith(`.${componentName}__`)
+            && (selectorList[index] = `.${componentName}__${selector.slice(1)}`);
+    });
+    return selectorList.join(' ');
+};
 
 /**
  *
@@ -39,19 +91,12 @@ function getOperationData(selectDom, operation, fields = {}) {
         return null;
     }
     const selectedDataMap = {
-        'id': selectDom.id,
-        'dataset': (selectDom.sanComponent
-            && selectDom.sanComponent.data.raw
-            && datasetFilter(selectDom.sanComponent.data.raw)) || {},
-        'rect': {
-            'left': selectDom.getBoundingClientRect().left,
-            'right': selectDom.getBoundingClientRect().right,
-            'top': selectDom.getBoundingClientRect().top,
-            'bottom': selectDom.getBoundingClientRect().bottom
-        },
-        'size': {
-            'width': selectDom.offsetWidth,
-            'height': selectDom.offsetHeight
+        id: selectDom.id,
+        dataset: getDataSet(selectDom),
+        rect: readBoxData(selectDom.getBoundingClientRect()),
+        size: {
+            width: selectDom.offsetWidth,
+            height: selectDom.offsetHeight
         }
     };
     const effectSelectDom = isScrollView(selectDom)
@@ -71,7 +116,7 @@ function getOperationData(selectDom, operation, fields = {}) {
     };
 
     const operationActionMap = {
-        'boundingClientRect': () => {
+        boundingClientRect: () => {
             return {
                 id: selectedDataMap.id,
                 dataset: selectedDataMap.dataset,
@@ -79,7 +124,7 @@ function getOperationData(selectDom, operation, fields = {}) {
                 ...selectedDataMap.size
             };
         },
-        'fields': () => {
+        fields() {
             const fieldsTrueKeys = Object.keys(fields).filter(key => fields[key]);
             const trueKeysLen = fieldsTrueKeys.length;
             if (!trueKeysLen) {
@@ -101,7 +146,7 @@ function getOperationData(selectDom, operation, fields = {}) {
             }
             return data;
         },
-        'scrollOffset': () => {
+        scrollOffset() {
             return selectedScrollDataMap;
         }
     };
@@ -117,11 +162,9 @@ export function getSelectData({selector, queryType, operation, fields, contextId
             return getOperationData(selectDom, operation, fields);
         case 'selectAll':
             const selectDomArr =  Array.prototype.slice.call(rootDom.querySelectorAll(selector));
-            return selectDomArr.map(item => {
-                return getOperationData(item, operation, fields);
-            });
+            return selectDomArr.map(item => getOperationData(item, operation, fields));
         case 'selectViewport':
-            let data = getOperationData(rootDom.body, operation, fields);
+            let data = getOperationData(document.body, operation, fields);
             const rectArr = ['left', 'right', 'top', 'bottom'];
             rectArr.forEach(key => {
                 data.hasOwnProperty(key) && (data[key] = 0);

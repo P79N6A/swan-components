@@ -1,12 +1,4 @@
 /**
-* @license
-* Copyright Baidu Inc. All Rights Reserved.
-*
-* This source code is licensed under the Apache License, Version 2.0; found in the
-* LICENSE file in the root directory of this source tree.
-*/
-
-/**
  * @file 组件中数据校验的方法合集
  * @author jiamiao(jiamiao@baidu.com)
  */
@@ -33,7 +25,7 @@ export const typesCast = {
                 return data;
             }
             else if (isString(data)) {
-                return (+data ? +data : defaultVal);
+                return Number.isNaN(+data) ? defaultVal : +data;
             }
             return defaultVal;
         };
@@ -84,21 +76,20 @@ export const typesCast = {
 };
 
 export const internalDataComputedCreator = function (creatorArray) {
-    let computedForChecked = {};
-    creatorArray.forEach(creator => {
-        if (creator.data) {
-            const name = creator.name;
-            computedForChecked[`__${name}`] = typesCast.oneOf(name, creator.data);
+    return creatorArray.reduce((perv, current) => {
+        if (current.data) {
+            const name = current.name;
+            perv[`__${name}`] = typesCast.oneOf(name, current.data);
         }
         else {
-            const {name, caster} = creator;
+            const {name, caster} = current;
             if ('[object Array]' === Object.prototype.toString.call(caster)) {
-                computedForChecked[`__${name}`] = typesCast.oneOfType(name, caster, creator.default);
+                perv[`__${name}`] = typesCast.oneOfType(name, caster, current.default);
             }
             else {
-                computedForChecked[`__${name}`] = caster(name, creator.default);
+                perv[`__${name}`] = caster(name, current.default);
             }
         }
-    });
-    return computedForChecked;
+        return perv;
+    }, {});
 };

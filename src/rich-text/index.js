@@ -1,15 +1,8 @@
 /**
-* @license
-* Copyright Baidu Inc. All Rights Reserved.
-*
-* This source code is licensed under the Apache License, Version 2.0; found in the
-* LICENSE file in the root directory of this source tree.
-*/
-
-/**
  * @file rich-text component, use for support user's rich-text string/Array
  * @author houyu(houyu01@baidu.com)
  */
+import {addClassPrefix} from '../utils/custom-component';
 
 // 枚举标签可设置的属性
 const domAttributeReflection = {
@@ -232,7 +225,6 @@ class DomUtils {
 }
 
 export default {
-    dependencies: ['san'],
     behaviors: ['userTouchEvents', 'noNativeBehavior'],
     initData() {
         return {
@@ -242,10 +234,41 @@ export default {
 
     template: '<swan-rich-text></swan-rich-text>',
 
-    slaveRendered() {
+    attached() {
+        this.reRenderRichText();
+        this.watch('nodes', val => {
+            this.reRenderRichText();
+        });
+    },
+
+    reRenderRichText() {
         const domUtils = new DomUtils(this.san);
         const nodesFragment = domUtils.parseToFragment(this.data.get('nodes'));
         this.el.innerHTML = '';
         this.el.appendChild(nodesFragment);
-    }
+
+        // 如果rich-text在自定义组件内使用, 则将其内部节点的className进行前缀添加
+        this.recentOwner
+        && this.recentOwner._isCustomComponent
+        && this.el
+        && this.el.childNodes.length
+        && this.replaceCustomComponentInnerClass(this.el.childNodes);
+    },
+
+    /**
+     * 自定义组件包含rich-text, 深度遍历子孙元素, 进行className前缀添加
+     * @param {Array} elements - 当前层级元素list
+     */
+    replaceCustomComponentInnerClass(elements) {
+        Array.from(elements)
+            .filter(element => element.className)
+            .forEach(element => {
+                element.className = element.className.split(' ')
+                    .filter(className => className !== '')
+                    .map(className => addClassPrefix(className, this.recentOwner.componentName))
+                    .join(' ');
+                element.childNodes.length && this.replaceCustomComponentInnerClass(element.childNodes);
+            });
+    },
+
 };

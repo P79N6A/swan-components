@@ -1,11 +1,3 @@
-/**
-* @license
-* Copyright Baidu Inc. All Rights Reserved.
-*
-* This source code is licensed under the Apache License, Version 2.0; found in the
-* LICENSE file in the root directory of this source tree.
-*/
-
 import image from '../../../src/image/index';
 import buildComponent from '../../mock/swan-core/build-component';
 import attach2Document from '../../utils/attach-to-document';
@@ -38,10 +30,10 @@ describe('component [' + COMPONENT_NAME + ']', () => {
 
 
     describe('events and message', () => {
-        it('should not dispatch bindload since img had loaded while listen imgLazyLoad message from communicator', done => {
+        it('should not dispatch bindload since img had loaded while listen componentScroll message from communicator', done => {
             let spy = sinon.spy(component, 'dispatchEvent');
             Communicator.getInstance().fireMessage({
-                type: 'imgLazyLoad'
+                type: 'componentScroll'
             });
             expect(spy.callCount).toBe(0);
             spy.restore();

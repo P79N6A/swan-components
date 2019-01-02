@@ -1,16 +1,10 @@
 /**
-* @license
-* Copyright Baidu Inc. All Rights Reserved.
-*
-* This source code is licensed under the Apache License, Version 2.0; found in the
-* LICENSE file in the root directory of this source tree.
-*/
-
-/**
  * @file bdml's file's picker-view-column elements <picker-view-column>
  * @author zengqingzhuang(zengqingzhuang@baidu.com)
  */
 import style from './index.css';
+import {getCoordinatePairFromMatrixStr} from '../utils';
+
 export default {
     behaviors: ['userTouchEvents', 'noNativeBehavior'],
     constructor() {
@@ -47,11 +41,21 @@ export default {
         this.contentRef = this.ref('columnContent');
         this.columnIndex = this.el.parentNode.children.length - 1;
         this.initViewColumnStyle();
-        this.indicatorHeight = this.ref('columnIndicator').offsetHeight;
+        this.indicatorHeight = this.getComputeHeight(this.ref('columnIndicator'));
         this.bindTransitionEnd();
+        this.communicator.onMessage(
+            `pickerView_${this.el.parentNode.dataset.sanid}`,
+            message => {
+                this.pickerViewDataChangeHandler();
+            }
+        );
     },
 
-    slaveRendered() {
+    detached() {
+        this.communicator.delHandler(`pickerView_${this.el.parentNode.dataset.sanid}`);
+    },
+
+    pickerViewDataChangeHandler() {
         this.total = this.contentRef.children.length;
         if (this.oldTotal !== this.total) {
             this.oldTotal = this.total;
@@ -67,15 +71,27 @@ export default {
     },
 
     /**
+     *
+     * 获取行内高度
+     *
+     * @param {Object} [obj] dom对象
+     * @return {number} 高度
+     */
+    getComputeHeight(obj) {
+        return parseInt(getComputedStyle(obj).height, 10) || 0;
+    },
+
+    /**
      * 初始化每列样式
      */
     initViewColumnStyle() {
         const {indicatorStyle, indicatorClass, maskStyle, maskClass} = this.scope.raw;
-        const pickerHeight = this.el.parentNode.parentNode.offsetHeight;
+        const pickerHeight = this.getComputeHeight(this.el.parentNode.parentNode);
         const indicatorRef = this.ref('columnIndicator');
+        let indicatorHeight = this.getComputeHeight(indicatorRef);
         this.ref('columnGroup').style.height = pickerHeight + 'px';
         indicatorRef.style.cssText = indicatorStyle;
-        const halfHeight = (pickerHeight - indicatorRef.offsetHeight) / 2 + 'px';
+        const halfHeight = (pickerHeight - indicatorHeight) / 2 + 'px';
         Object.assign(this.ref('columnMask').style, {
             cssText: maskStyle,
             backgroundSize: '100% ' + halfHeight
@@ -213,8 +229,7 @@ export default {
      */
     stopColumnSliding() {
         const transform = getComputedStyle(this.contentRef).transform;
-        const matrix = transform.match(/matrix\(([^,]+),\s*([^,]+),\s*([^,]+),\s*([^,]+),\s*([^,]+),\s*([^,]+)\)/);
-        this.curTranslateY = Number(matrix[6]);
+        this.curTranslateY = getCoordinatePairFromMatrixStr(transform).y;
         this.setTransfrom(0, 0);
     },
 

@@ -1,17 +1,17 @@
 /**
-* @license
-* Copyright Baidu Inc. All Rights Reserved.
-*
-* This source code is licensed under the Apache License, Version 2.0; found in the
-* LICENSE file in the root directory of this source tree.
-*/
-
-/**
  * @file bdml's file's swiper elements <swiper>
  * @author liuyuekeng(liuyuekeng@baidu.com)
  */
 import style from './index.css';
 import {internalDataComputedCreator, typesCast} from '../computedCreator';
+import {isNaN, rpx2Vm} from '../utils';
+
+function marginCaster(attr) {
+    return function () {
+        let raw = typesCast.stringCast(attr).call(this);
+        return rpx2Vm(raw);
+    };
+}
 
 export default {
 
@@ -66,6 +66,8 @@ export default {
         this.index = 0;
         // 点击开始时的索引
         this.touchStartIndex = null;
+        // 是否轮播，内部状态
+        this.circular = false;
     },
 
     initData() {
@@ -106,11 +108,13 @@ export default {
             {name: 'vertical', caster: typesCast.boolCast},
             {name: 'circular', caster: typesCast.boolCast},
             {name: 'indicatorDots', caster: typesCast.boolCast},
-            {name: 'autoplay', caster: typesCast.boolCast}
+            {name: 'autoplay', caster: typesCast.boolCast},
+            {name: 'previousMargin', caster: marginCaster},
+            {name: 'nextMargin', caster: marginCaster}
         ]),
         getStyle() {
-            let previousMargin = this.data.get('previousMargin');
-            let nextMargin = this.data.get('nextMargin');
+            let previousMargin = this.data.get('__previousMargin');
+            let nextMargin = this.data.get('__nextMargin');
             let style = this.data.get('__vertical')
                 ? `top: ${previousMargin}; bottom: ${nextMargin}`
                 : `left: ${previousMargin}; right: ${nextMargin}`;
@@ -122,14 +126,17 @@ export default {
      * 组件渲染完成钩子
      */
     attached() {
-        let pageData = this.data;
         this.swiperSlides = this.ref('swiperSlides');
-        pageData.set('circular', pageData.get('__circular')
-            && this.swiperSlides.children.length > +this.data.get('displayMultipleItems'));
+        this.circular = this.data.get('__circular')
+            && this.swiperSlides.children.length > +this.data.get('displayMultipleItems');
         this.watchParams();
     },
 
     detached() {
+        this.autoplayTimer && clearInterval(this.autoplayTimer);
+        this.autoplayTimer = null;
+        this.animationTimer && clearTimeout(this.animationTimer);
+        this.animationTimer = null;
     },
 
     /**
@@ -139,8 +146,8 @@ export default {
         this.swiperSlides = this.ref('swiperSlides');
         const total = this.swiperSlides.children.length;
         if (this.total !== total) {
-            this.data.set('circular', this.data.get('__circular')
-                && total > +this.data.get('displayMultipleItems'));
+            this.circular = this.data.get('__circular')
+                && total > +this.data.get('displayMultipleItems');
             // 数据更新后要在nextTick视图才更新
             this.nextTick(() => {
                 this.total = total;
@@ -154,6 +161,9 @@ export default {
      */
     watchParams() {
         this.watch('current', value => {
+            if (isNaN(value)) {
+                return;
+            }
             this.current2Index();
             this.goToIndex();
         });
@@ -230,6 +240,7 @@ export default {
             items[i].style.transform = style;
             items[i].style.webkitTransform = style;
             items[i].style[this.data.get('__vertical') ? 'height' : 'width'] = this.unitDistancePercent + '%';
+            items[i].style.position = 'absolute';
         }
     },
 
@@ -323,7 +334,6 @@ export default {
         if (start > this.total - 1) {
             return false;
         }
-        let circular = this.data.get('__circular');
         let swiperDots = this.data.get('swiperDots');
         let newSwiperDots = [];
         swiperDots.forEach((v, k) => {
@@ -333,7 +343,7 @@ export default {
             let index = start + i;
             if (index < this.total) {
                 newSwiperDots[index] = 1;
-            } else if (circular) {
+            } else if (this.circular) {
                 newSwiperDots[index - this.total] = 1;
             }
         }
@@ -352,14 +362,13 @@ export default {
         if (currentItemId !== '') {
             return;
         }
-        let circular = this.data.get('__circular');
         let index;
         if (!this.total) {
             index = 0;
         } else if (current < 0) {
-            index = circular ? this.total - 1 : 0;
+            index = this.circular ? this.total - 1 : 0;
         } else if (current >= this.total) {
-            index = circular ? 0 : this.total - 1;
+            index = this.circular ? 0 : this.total - 1;
         } else {
             index = current;
         }
@@ -395,6 +404,8 @@ export default {
             : `translate(${offset}px, 0)`;
         this.swiperSlides.style['-webkit-transform'] = style;
         this.swiperSlides.style.transform = style;
+        // img组件懒加载
+        this.communicator.fireMessage({type: 'componentScroll'});
     },
 
     /**
@@ -424,7 +435,7 @@ export default {
      * 在衔接模式下保证视口两侧元素个数平衡
      */
     bufferReset() {
-        if (!this.data.get('__circular')) {
+        if (!this.circular) {
             return;
         }
         // 视口左侧区域宽度，负值
@@ -464,7 +475,7 @@ export default {
      * 在衔接模式下保证slider偏移量不超过总长度
      */
     slicerRangeLimit() {
-        if (!this.data.get('__circular')) {
+        if (!this.circular) {
             return;
         }
         if (this.offset < this.offsetLimitL) {
@@ -492,7 +503,7 @@ export default {
         if (remainder > 0 && remainder + speedFactor > 0.5) {
             goTo ++;
         }
-        if (!this.data.get('__circular')) {
+        if (!this.circular) {
             if (goTo > 0) {
                 goTo = 0;
             }
@@ -520,6 +531,10 @@ export default {
         this.bufferReset();
         this.setActiveSwiperDots();
         this.triggerChange(autoPlay ? 'autoplay' : '');
+        if (autoPlay) {
+            this.data.set('current', NaN);
+            this.data.set('currentItemId', '');
+        }
     },
 
     /**
@@ -528,6 +543,8 @@ export default {
     updateIndexByOffset() {
         let index = -parseInt(this.offset / this.unitDistance, 10);
         this.index = this.indexRangeLimit(index);
+        this.data.set('current', NaN);
+        this.data.set('currentItemId', '');
     },
 
     indexRangeLimit(index) {
@@ -639,7 +656,7 @@ export default {
             }
             this.index ++;
             if (this.index === this.total) {
-                if (this.data.get('__circular')) {
+                if (this.circular) {
                     this.setSliderDuration(0);
                     this.transformSlider(this.unitDistance);
                     this.bufferReset();

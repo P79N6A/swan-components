@@ -1,17 +1,9 @@
 /**
-* @license
-* Copyright Baidu Inc. All Rights Reserved.
-*
-* This source code is licensed under the Apache License, Version 2.0; found in the
-* LICENSE file in the root directory of this source tree.
-*/
-
-/**
  * @file bdml's file's swan-slider elements <slider>
  * @author jiamiao(jiamiao@baidu.com)
  */
 import style from './index.css';
-import {attrValBool} from '../utils';
+import {internalDataComputedCreator, typesCast} from '../computedCreator';
 
 export default {
 
@@ -24,7 +16,8 @@ export default {
                     on-touchstart="onTouchStart($event)"
                     on-touchmove="onTouchMove($event)"
                     on-touchend="onTouchEnd($event)">
-                    <div class="${style['swan-slider-handle-wrapper']}">
+                    <div class="${style['swan-slider-handle-wrapper']}"
+                        style="background: {{backgroundColor}};">
                         <div class="${style['swan-slider-handle']}"
                             style="left: {{handleLeft}}%;"></div>
                         <div class="${style['swan-slider-thumb']}"
@@ -35,13 +28,10 @@ export default {
                             margin-top: -{{blockSize/2}}px;
                             margin-left: -{{blockSize/2}}px;"></div>
                         <div class="${style['swan-slider-track']}"
-                            style="background: {{activeColor}}"></div>
-                        <div class="${style['swan-slider-step']}"
-                            style="width: {{100 - handleLeft}}%;
-                            background: {{backgroundColor}}"></div>
+                            style="background: {{activeColor}}; width: {{handleLeft}}%;"></div>
                     </div>
                 </div>
-                <span s-if="{{showValue && showValue !== 'false'}}" class="${style['swan-slider-value']}">
+                <span s-if="{{__showValue && __showValue !== 'false'}}" class="${style['swan-slider-value']}">
                     {{value}}
                 </span>
             </div>
@@ -51,6 +41,7 @@ export default {
     constructor(props) {
         this.touchstartElement = '';
         this.startPageX = 0; // touchstart时的坐标点，为了判断touchend是否是点击结束还是移动结束
+        this.name = this.data.get('name');
     },
 
     initData() {
@@ -69,6 +60,10 @@ export default {
     },
 
     computed: {
+        ...internalDataComputedCreator([
+            {name: 'disabled', caster: typesCast.boolCast},
+            {name: 'showValue', caster: typesCast.boolCast}
+        ]),
         min() {
             const min = this.data.get('min');
             return typeof min === 'number' ? min : ~~min;
@@ -102,9 +97,15 @@ export default {
     },
 
     created() {
-        const {value} = this.data.get();
         // 为了reset表单时记录重置的slider默认属性
-        this.defaultValue = value;
+        this.defaultValue = this.data.get('value');
+    },
+
+    attached() {
+        this.watch('name', name => {
+            this.reRegisterFormItem(this.name);
+            this.name = name;
+        });
     },
 
     /**
@@ -166,17 +167,17 @@ export default {
      * @param {number} [targetX] 结束点的x坐标
      */
     moveTo(targetX) {
-        if (attrValBool(this.data.get('disabled'))) {
+        if (this.data.get('__disabled')) {
             return;
         }
         const {max, min, step} = this.data.get();
         let wrapper = this.el.querySelector('.' + style['swan-slider-tap-area']);
         let wrapperWidth = wrapper.clientWidth;
         // 控制最大最小值在slider中
-        let sliderActiveWidht = Math.min(Math.max(0, targetX - wrapper.offsetLeft), wrapperWidth);
+        let sliderActiveWidth = Math.min(Math.max(0, targetX - wrapper.getBoundingClientRect().left), wrapperWidth);
         let steps = (max - min) / step;
         let stepDistance = wrapperWidth / steps;
-        let targetStep = Math.round(sliderActiveWidht / stepDistance);
+        let targetStep = Math.round(sliderActiveWidth / stepDistance);
         let currentValue = min + targetStep * step;
         if (currentValue > max || currentValue < min) {
             return;

@@ -1,17 +1,9 @@
 /**
-* @license
-* Copyright Baidu Inc. All Rights Reserved.
-*
-* This source code is licensed under the Apache License, Version 2.0; found in the
-* LICENSE file in the root directory of this source tree.
-*/
-
-/**
  * @file enviromentEvent.js 封装宿主上下文派发的事件信息(宿主可能为webview或者原声rootview，此处为先手，
  *                          切换底层时候，切换enviroment即可)
  * @author houyu(houyu01@baidu.com)
  */
-import EventsEmitter from '@baidu/events-emitter';
+import EventsEmitter from './events-emitter';
 
 const global = window;
 
@@ -50,21 +42,21 @@ export default class EnviromentEvent {
         {
             type: 'reachBottom',
             called: false,
-            buttonReached: false,
+            bottomReached: false,
             handler({onReachBottomDistance = 0}, eventItem) {
                 this.enviromentListen('scroll', event => {
                     const bottomDistance = getScrollHeight() - global.scrollY - getWindowHeight();
-                    if (!eventItem.buttonReached
+                    if (!eventItem.bottomReached
                        && bottomDistance <= onReachBottomDistance
                     ) {
                         this.communicator.fireMessage({
                             type: 'reachBottom',
                             event
                         });
-                        eventItem.buttonReached = true;
+                        eventItem.bottomReached = true;
                     }
                     else if (bottomDistance > onReachBottomDistance) {
-                        eventItem.buttonReached = false;
+                        eventItem.bottomReached = false;
                     }
                 });
             }
