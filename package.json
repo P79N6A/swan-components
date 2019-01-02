@@ -22,7 +22,6 @@
         "components"
     ],
     "dependencies": {
-        "@baidu/events-emitter": "^1.0.15",
         "fs-finder": "^1.8.1"
     },
     "devDependencies": {
