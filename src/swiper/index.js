@@ -20,9 +20,10 @@ export default {
     template: `<swan-swiper class="swan-swiper-wrapper">
             <div class="swan-swiper-slides" style="{{getStyle}}">
                 <div s-ref="swiperSlides" class="swan-swiper-slide-frame"
-                    on-touchend="onTouchEnd($event)"
-                    on-touchstart="onTouchStart($event)"
-                    on-touchmove="onTouchMove($event)">
+                    on-touchend="onSwiperTouchEnd($event)"
+                    on-touchcancel="onSwiperTouchEnd($event)"
+                    on-touchstart="onSwiperTouchStart($event)"
+                    on-touchmove="onSwiperTouchMove($event)">
                     <slot></slot>
                 </div>
             </div>
@@ -95,7 +96,7 @@ export default {
             // 指示点数组，1代表active，反之为0
             'swiperDots': [],
             // 同时显示的滑块数量
-            'displayMultipleItems': '1',
+            'displayMultipleItems': 1,
             // 前边距，支持px和rpx
             'previousMargin': '0px',
             // 后边距，支持px和rpx
@@ -130,6 +131,14 @@ export default {
         this.circular = this.data.get('__circular')
             && this.swiperSlides.children.length > +this.data.get('displayMultipleItems');
         this.watchParams();
+
+        this.communicator.onMessage('fullscreenchange', message => {
+            let data = message && message.data;
+            // 对于 ios 同层渲染，全屏时候需要禁用掉手势监听
+            this.isVideoFullscreen = data
+                && data.isVideoFullscreenChange
+                && data.isFullscreen;
+        });
     },
 
     detached() {
@@ -143,17 +152,24 @@ export default {
      * 数据更新钩子
      */
     slaveRendered() {
-        this.swiperSlides = this.ref('swiperSlides');
-        const total = this.swiperSlides.children.length;
-        if (this.total !== total) {
-            this.circular = this.data.get('__circular')
-                && total > +this.data.get('displayMultipleItems');
-            // 数据更新后要在nextTick视图才更新
-            this.nextTick(() => {
+        // 数据更新后要在nextTick视图才更新
+        this.nextTick(() => {
+            this.swiperSlides = this.ref('swiperSlides');
+            let {displayMultipleItems, __vertical} = this.data.get();
+            displayMultipleItems = parseInt(displayMultipleItems, 10);
+            this.containerWidth = this.swiperSlides.clientWidth;
+            this.containerHeight = this.swiperSlides.clientHeight;
+            this.unitDistance = (__vertical ? this.containerHeight : this.containerWidth) / (displayMultipleItems);
+            this.unitDistancePercent = 100 / (displayMultipleItems);
+            const total = this.swiperSlides.children.length;
+            if (this.total !== total || this.oriUnitDistance !== this.unitDistance) {
+                this.circular = this.data.get('__circular')
+                    && total > +this.data.get('displayMultipleItems');
                 this.total = total;
+                this.oriUnitDistance = this.unitDistance;
                 this.resetSlider();
-            });
-        }
+            }
+        });
     },
 
     /**
@@ -189,12 +205,6 @@ export default {
      */
     resetSlider() {
         const displayMultipleItems = +this.data.get('displayMultipleItems');
-        this.containerWidth = this.swiperSlides.clientWidth;
-        this.containerHeight = this.swiperSlides.clientHeight;
-        this.unitDistance = (this.data.get('__vertical')
-            ? this.containerHeight
-            : this.containerWidth) / (displayMultipleItems);
-        this.unitDistancePercent = 100 / (displayMultipleItems);
         this.offsetLimitL = (0.5 - this.total) * this.unitDistance;
         this.offsetLimitR = 0.5 * this.unitDistance;
         this.remainingCount = this.total - displayMultipleItems;
@@ -261,8 +271,8 @@ export default {
      * 鼠标点击事件，记录起始点击位置
      * @param {Object} [event] 鼠标event对象
      */
-    onTouchStart(event) {
-        if (event.touches.length >= 2) {
+    onSwiperTouchStart(event) {
+        if (this.isVideoFullscreen || event.touches.length >= 2) {
             return;
         }
         this.stopAnimation();
@@ -275,20 +285,35 @@ export default {
      * 鼠标移动事件
      * @param {Object} [event] 鼠标event对象
      */
-    onTouchMove(event) {
-        if (event.touches.length >= 2) {
+    onSwiperTouchMove(event) {
+        if (this.isVideoFullscreen || event.touches.length >= 2) {
             return false;
         }
         const touch = event.changedTouches[0];
         let diffX = touch.pageX - this.lastTouch.x;
         let diffY = touch.pageY - this.lastTouch.y;
         this.touchRecord(event);
+        const vertical = this.data.get('__vertical');
         if (!this.direction) {
             this.direction = Math.abs(diffX) >= Math.abs(diffY) ? 'x' : 'y';
+            if (!vertical
+                && this.direction === 'x'
+                && this.swaninterface.boxjs.platform.isAndroid()) {
+                // 阻止 android 端下拉刷新
+                this.boxjs.ui.open({
+                    name: 'swan-preventPullDownRefresh',
+                    data: {
+                        prevent: true,
+                        slaveId: `${this.slaveId}`
+                    }
+                });
+            }
         }
-        const vertical = this.data.get('__vertical');
         if ((!vertical && this.direction === 'x') || (vertical && this.direction === 'y')) {
-            event.preventDefault();
+            // patch Intervention js内部报错
+            if (event.cancelable) {
+                event.preventDefault();
+            }
             event.stopPropagation();
         } else {
             return false;
@@ -303,13 +328,22 @@ export default {
      * 鼠标抬起事件
      * @param {Object} [event] 鼠标event对象
      */
-    onTouchEnd(event) {
-        if (event.touches.length >= 2) {
+    onSwiperTouchEnd(event) {
+        if (this.isVideoFullscreen || event.touches.length >= 2) {
             return false;
         }
+        // 开启 android 端下拉刷新
+        this.swaninterface.boxjs.platform.isAndroid() && this.boxjs.ui.open({
+            name: 'swan-preventPullDownRefresh',
+            data: {
+                prevent: false,
+                slaveId: `${this.slaveId}`
+            }
+        });
         const direction = this.direction;
         this.direction = '';
         this.snap();
+        this.autoPlayOn();
         const vertical = this.data.get('__vertical');
         if ((vertical && direction === 'x') || (!vertical && direction === 'y')) {
             return;
@@ -321,7 +355,6 @@ export default {
             this.triggerChange('touch');
         }
         this.touchStartIndex = null;
-        this.autoPlayOn();
     },
 
     /**
@@ -554,7 +587,7 @@ export default {
         while (index >= this.total) {
             index -= this.total;
         }
-        if (index === -0) {
+        if (Object.is(index, -0)) {
             index = 0;
         }
         return index;
@@ -618,15 +651,6 @@ export default {
     },
 
     /**
-     * 清空touch记录
-     */
-    clearTouchRecord() {
-        this.lastTouch = null;
-        this.second2LastTouch = null;
-        this.startTouch = null;
-    },
-
-    /**
      * 通过最后两个touch计算轴方向的瞬时速度
      * @return {number} 速度px/s
      */
@@ -664,7 +688,7 @@ export default {
                 this.index = 0;
                 setTimeout(() => {
                     this.goToIndex(true);
-                }, 0);
+                }, 30);
             } else {
                 this.goToIndex(true);
             }

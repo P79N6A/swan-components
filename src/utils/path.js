@@ -37,15 +37,35 @@ export const absolutePathResolver = (basePath, pagePath, path) => {
         return path;
     }
     // 远程地址无需转换
-    if (/^(http:\/\/)|(https:\/\/)/g.test(path)) {
+    if (/^https?:\/\//.test(path)) {
         return path;
     }
     let pre = '/';
-    basePath = basePath.replace(/^(https?:\/\/[\w-\.]+[:[\d]+]?)(\/)?/, (...args)=> {
+    basePath = basePath.replace(/^(https?:\/\/[\w-.]+[:[\d]+]?)(\/)?/, (...args)=> {
         pre = args[1] + (args[2] || '/');
         return '';
     });
     // 绝对路径的话，不用page路径
-    const pageRoute = /^\//.test(path) ? '' : pagePath.replace(/[^\/]*$/g, '');
+    const pageRoute = /^\//.test(path) ? '' : pagePath.replace(/[^/]*$/g, '');
     return pre + pathResolver(`${basePath}/${pageRoute}`, path).join('/');
+};
+
+/**
+ * 对于自定义组件内部的原生组件，将其动态资源相对路径处理成绝对路径
+ *
+ * @param {string} customComponentPath - 自定义组件的模板路径
+ * @param {string} srcPath - 资源路径
+ * @return {string} 解析后的路径
+ */
+export const componentPathResolver = (customComponentPath, srcPath) => {
+    if (typeof srcPath !== 'string') {
+        return srcPath;
+    }
+    const trimedSrcPath = srcPath.trim();
+    if (!/^\.\.?\//.test(trimedSrcPath)) {
+        return trimedSrcPath;
+    }
+    return '/' + pathResolver(customComponentPath, '../' + trimedSrcPath, () => {
+        console.warn('找不到路径');
+    }).join('/');
 };

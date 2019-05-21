@@ -54,6 +54,7 @@ function getTouchObj(useRelativePosition, x, y, target) {
 function dispatchTouchEvent(target, eventType, touchList) {
     let touchEvent = new TouchEvent(eventType, {
         bubbles: true,
+        cancelable: true,
         touches: touchList,
         targetTouches: touchList,
         changedTouches: touchList

@@ -7,54 +7,26 @@ const webpackConfig = require('../webpack/webpack.test.conf');
 
 module.exports = function (config) {
     config.set({
-        browsers: ['Chrome'],
+        browsers: ['NoSandboxChromeHeadless'],
+        captureTimeout: 60000,
+        customLaunchers: {
+            NoSandboxChromeHeadless: {
+                base: 'ChromeHeadless',
+                flags: ['--no-sandbox']
+            }
+        },
         frameworks: ['jasmine'],
         port: 9876,
         colors: true,
         autoWatch: true,
+
         files: [
-            './components/animation-view/*.js',
-            './components/ar-camera/*.js',
-            './components/audio/*.js',
-            './components/button/*.js',
-            './components/camera/*.js',
-            './components/canvas/*.js',
-            './components/checkbox/*.js',
-            './components/checkbox-group/*.js',
-            './components/cover-image/*.js',
-            './components/cover-view/*.js',
-            './components/form/*.js',
-            './components/icon/*.js',
-            './components/image/*.js',
-            './components/input/*.js',
-            './components/label/*.js',
-            './components/live-player/*.js',
-            './components/map/*.js',
-            './components/mask/*.js',
-            './components/movable-area/*.js',
-            './components/movable-view/*.js',
-            './components/navigator/*.js',
-            './components/open-data/*.js',
+            // karma入口文件，入口文件太多会拖慢单测
+            // 对于常规组件，只需要放到entry.js中，对于camera等需要放多个页面跑的才弄成多入口
+            './components/entry.js',
             './components/page/*.js',
-            './components/picker/*.js',
-            './components/picker-view/*.js',
-            './components/picker-view-column/*.js',
-            './components/progress/*.js',
-            './components/radio/*.js',
-            './components/radio-group/*.js',
-            './components/rich-text/*.js',
-            './components/scroll-view/*.js',
-            './components/slider/*.js',
-            './components/super-custom-component/*.js',
-            './components/swan-component/*.js',
-            './components/swiper/*.js',
-            './components/swiper-item/*.js',
-            './components/switch/*.js',
-            './components/text/*.js',
-            './components/textarea/*.js',
-            './components/video/*.js',
-            './components/view/*.js',
-            './components/web-view/*.js'
+            './components/ar-camera/*.js',
+            './components/camera/*.js'
         ],
         preprocessors: {
             '../test/**/*.js': ['webpack']
@@ -63,11 +35,14 @@ module.exports = function (config) {
         webpackMiddleware: {
             stats: 'errors-only'
         },
-        reporters: ['spec', 'coverage'],
+        reporters: ['coverage', 'html'],
+        htmlReporter: {
+            outputDir: './test', // where to put the reports
+            reportName: 'report' // report summary filename; browser info by default
+        },
         coverageReporter: {
-            dir: '../coverage',
-            reporters: [
-                {
+            dir: '../test/coverage',
+            reporters: [{
                     type: 'lcov',
                     subdir: '.'
                 },
@@ -75,6 +50,12 @@ module.exports = function (config) {
                     type: 'text-summary'
                 }
             ]
-        }
+        },
+        singleRun: true,
+        concurrency: Infinity,
+        captureTimeout: 210000,
+        browserDisconnectTolerance: 3,
+        browserDisconnectTimeout: 210000,
+        browserNoActivityTimeout: 210000
     });
 };

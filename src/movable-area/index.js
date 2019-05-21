@@ -80,7 +80,6 @@ export default {
      * @param {Object} [e] 鼠标event对象
      */
     onMovableAreaTouchEnd(e) {
-        this.preventEvents(e);
         this.isAreaDoublePointScaling = false;
     },
 

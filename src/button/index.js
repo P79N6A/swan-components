@@ -2,15 +2,17 @@
  * @file bdml's file's base elements <image>
  * @author houyu(houyu01@baidu.com)
  *         jianglian(jianglian01@baidu.com)
- */
+*/
 import style from './index.css';
 import {attrValBool, privateKey, isEqualObject, computeDistance} from '../utils';
 import {internalDataComputedCreator, typesCast} from '../computedCreator';
 
-const LAUNCH_APP_INFO_FAIL_CODE = 1001;
-const LAUNCH_APP_INFO_FAIL_MSG = '打开APP失败，获取最低使用要求数据失败';
-const LAUNCH_APP_FAIL_CODE = 1003;
-const LAUNCH_APP_FAIL_MSG = '打开APP失败，用户未达到最低使用要求';
+const LAUNCH_APP_GET_DATA_ERROR_CODE = 1001;
+const LAUNCH_APP_GET_DATA_ERROR_MSG = '打开APP失败，获取最低使用要求数据失败';
+const LAUNCH_APP_NO_APP_CODE = 1002;
+const LAUNCH_APP_NO_APP_MSG = '打开App失败，本地没有安装App';
+const LAUNCH_APP_NOT_VALID_CODE = 1003;
+const LAUNCH_APP_NOT_VALID_MSG = '打开APP失败，用户未达到最低使用要求';
 
 export default {
 
@@ -42,7 +44,8 @@ export default {
             formType: 'buttonclick',
             hidden: false,
             [privateKey]: {
-                componentId: this.id
+                componentId: this.id,
+                isIos: this.swaninterface.boxjs.platform.isIOS()
             }
         };
     },
@@ -68,7 +71,8 @@ export default {
     },
 
     template: `<swan-button type="{{__type}}"
-        class="{{privateStyle[__size]}} {{__privateClass}} {{__disabled ? 'swan-button-disabled' : ''}}"
+        class="{{privateStyle[__size]}} {{__privateClass}} {{__disabled ? 'swan-button-disabled' : ''}}
+        {{provideData.isIos ? 'swan-button-radius-ios' : ''}}"
         loading="{{__loading}}"
         size="{{__size}}"
         plain="{{__plain}}"
@@ -108,8 +112,7 @@ export default {
                         name: 'swan-userInfo',
                         data: {
                             callback: res => {
-                                let jsonRes = typeof res === 'string' ? JSON.parse(res) : res;
-                                console.log(jsonRes);
+                                let jsonRes = this.parseDataFromAPI(res);
                                 if (jsonRes.data && !jsonRes.data.errno) {
                                     const data = jsonRes.data;
                                     this.dispatchEvent('bindgetuserinfo', {
@@ -140,7 +143,7 @@ export default {
                         name: 'swan-phoneNumber',
                         data: {
                             callback: res => {
-                                let jsonRes = typeof res === 'string' ? JSON.parse(res) : res;
+                                let jsonRes = this.parseDataFromAPI(res);
                                 if (jsonRes.data && !jsonRes.data.errno) {
                                     this.dispatchEvent('bindgetphonenumber', {
                                         detail: {
@@ -160,7 +163,7 @@ export default {
                         }
                     });
                     break;
-                case 'share':
+                case 'share': {
                     let eventParams = this.getDispatchEventObj({detail: {}});
                     if (eventParams.currentTarget) {
                         eventParams = Object.assign(eventParams, eventParams.currentTarget);
@@ -170,6 +173,7 @@ export default {
                         eventParams
                     });
                     break;
+                }
                 case 'openSetting':
                     // 创建二级回调的函数名及函数体
                     this.callbackName = `buttonCallback_${new Date() - 0}_${this.id || ''}`;
@@ -187,7 +191,7 @@ export default {
                         });
                     });
                     break;
-                case 'contact':
+                case 'contact': {
                     this.callbackName = `buttonCallback_${new Date() - 0}_${this.id || ''}`;
                     // 获取appKey逻辑待2018/11月api重构完成后下移至api中 @renzhonghua
                     const appInfo = this.boxjs.data.get({name: 'swan-appInfoSync'});
@@ -219,101 +223,57 @@ export default {
                         }
                     });
                     break;
-                case 'launchApp':
-                    const self = this;
-                    let scheme = this.data.get('launchScheme');
+                }
+                case 'launchApp': {
                     this.boxjs.data.get({
                         name: 'swan-launchAppInfo',
                         data: {
-                            callback(res) {
-                                let jsonRes = typeof res === 'string' ? JSON.parse(res) : res;
-                                let {ext = [], forbidden, visitDuration, launchCount} = jsonRes.data || {};
-                                if (!ext.length) {
-                                    self.dispatchEvent('binderror', {
-                                        detail: {
-                                            errCode: LAUNCH_APP_INFO_FAIL_CODE,
-                                            errMsg: LAUNCH_APP_INFO_FAIL_MSG
-                                        }
-                                    });
-                                    return false;
-                                }
-                                const extObj = ext.map(item => JSON.parse(item))
-                                    .reduce((r, v) => Object.assign(r, v), {});
-                                for (let key in extObj) {
-                                    let val = extObj[key];
-                                    if (val['daily_duration'] === '' || val['launch_count'] === '') {
-                                        self.dispatchEvent('binderror', {
-                                            detail: {
-                                                errCode: LAUNCH_APP_INFO_FAIL_CODE,
-                                                errMsg: LAUNCH_APP_INFO_FAIL_MSG
-                                            }
-                                        });
-                                        return false;
-                                    }
-                                    switch (key) {
-                                        case 'strategy':
-                                            if (forbidden) {
-                                                if (visitDuration < ~~val['daily_duration'] * 60000
-                                                    && launchCount < ~~val['launch_count']) {
-                                                    self.dispatchEvent('binderror', {
-                                                        detail: {
-                                                            errCode: LAUNCH_APP_FAIL_CODE,
-                                                            errMsg: LAUNCH_APP_FAIL_MSG
-                                                        }
-                                                    });
-                                                    return false;
-                                                }
-                                            }
-                                            break;
-                                        case 'package_name':
-                                            let schemeChecked = false;
-                                            for (let i = 0; i < val.length; i++) {
-                                                const value = val[i];
-                                                const reg = new RegExp(`^${value}`, 'gi');
-                                                if (reg.test(scheme)) {
-                                                    schemeChecked = true;
-                                                    break;
-                                                }
-                                            }
-                                            if (!schemeChecked) {
-                                                self.dispatchEvent('binderror', {
-                                                    detail: {
-                                                        errCode: LAUNCH_APP_FAIL_CODE,
-                                                        errMsg: LAUNCH_APP_FAIL_MSG
-                                                    }
-                                                });
-                                                return false;
-                                            }
-                                            break;
-                                    }
-                                }
-                                Object.keys(extObj).length && self.boxjs.ui.open({
-                                    name: 'swan-app',
-                                    data: {
-                                        open: encodeURIComponent(scheme),
-                                        download: '',
-                                        isNeedDownload: false,
-                                        invokAnyWay: true
-                                    }
-                                }).catch(() => {
-                                    self.dispatchEvent('binderror', {
-                                        detail: {
-                                            errCode: 1002,
-                                            errMsg: '小程序打开 App 失败，本地没有安装 App'
-                                        }
-                                    });
-                                });
+                            callback: res => {
+                                let jsonRes = this.parseDataFromAPI(res);
+                                let {visitDuration = '', launchCount = ''} = jsonRes.data || {};
+                                this.getAuthorityFromServer(visitDuration, launchCount);
                             }
                         }
                     }).catch(err => {
                         this.dispatchEvent('binderror', {
                             detail: {
-                                errCode: LAUNCH_APP_FAIL_CODE,
-                                errMsg: LAUNCH_APP_FAIL_MSG
+                                errCode: LAUNCH_APP_NOT_VALID_CODE,
+                                errMsg: LAUNCH_APP_NOT_VALID_MSG
                             }
                         });
                     });
                     break;
+                }
+                case 'faceVerify': {
+                    this.boxjs.ui.open({
+                        name: 'swan-faceVerify',
+                        data: {
+                            callback: res => {
+                                let jsonRes = this.parseDataFromAPI(res);
+                                let detail = {
+                                    errMsg: jsonRes.message || 'bindfaceverify:fail auth deny'
+                                };
+                                if (+jsonRes.status === 0) {
+                                    detail = {
+                                        callbackKey: jsonRes.data && jsonRes.data.callbackKey,
+                                        errMsg: 'bindfaceverify:ok'
+                                    };
+                                }
+
+                                this.dispatchEvent('bindfaceverify', {
+                                    detail
+                                });
+                            }
+                        }
+                    }).catch(err => {
+                        this.dispatchEvent('bindfaceverify', {
+                            detail: {
+                                errMsg: err.errMsg || 'bindfaceverify:fail auth deny'
+                            }
+                        });
+                    });
+                    break;
+                }
             }
         });
 
@@ -334,6 +294,154 @@ export default {
                 }
             }
         );
+    },
+
+    /**
+     * 从api获取的数据 转成对象
+     *
+     * @param {Object|string} data api返回的原始数据
+     * @return {Object} json数据
+     */
+    parseDataFromAPI(data) {
+        let result = data;
+        if (typeof data === 'string') {
+            try {
+                result = JSON.parse(data);
+            }
+            catch (e) {
+                result = {};
+            }
+        }
+        return result;
+    },
+
+    /**
+     * 从server端获取是否有权限打开、下载
+     *
+     * @param {number} visitDuration 用户停留时常，单位ms
+     * @param {number} launchCount 打开小程序次数
+     */
+    getAuthorityFromServer(visitDuration, launchCount) {
+        let scheme = this.data.get('launchScheme');
+        let {appId = '', scene = ''} = this.boxjs.data.get({name: 'swan-appInfoSync'});
+
+        this.swan.request({
+            url: 'https://mbd.baidu.com/ma/openloadapp',
+            method: 'POST',
+            dataType: 'json',
+            data: {
+                appId,
+                scene,
+                scheme,
+                launchCount,
+                visitDuration
+            },
+            header: {
+                'content-type': 'application/x-www-form-urlencoded'
+            },
+            success: res => {
+                let data = res.data && res.data.data || {};
+                let {canOpenApp = false} = data;
+                let needDownload = false;
+                needDownload = data.isNeedDownload;
+
+                this.confirmLaunchApp(canOpenApp, needDownload);
+            },
+            fail: err => {
+                this.dispatchEvent('binderror', {
+                    detail: {
+                        errCode: LAUNCH_APP_GET_DATA_ERROR_CODE,
+                        errMsg: LAUNCH_APP_GET_DATA_ERROR_MSG
+                    }
+                });
+            }
+        });
+    },
+
+    /**
+     * 打开前弹窗询问
+     *
+     * @param {boolean} canOpenApp 是否能打开
+     * @param {boolean} needDownload 是否能下载
+     */
+    confirmLaunchApp(canOpenApp, needDownload) {
+        let self = this;
+        let isIOS = self.swaninterface.boxjs.platform.isIOS();
+        if (canOpenApp) {
+            // 如果已安装，需要弹窗提示是否打开app，ios暂不支持查询是否已安装某app
+            if (isIOS) {
+                self.launchApp(needDownload);
+            }
+            else {
+                self.swan.isAppInstalled({
+                    name: isIOS
+                        ? self.data.get('appInstalledIosName')
+                        : self.data.get('appInstalledAndroidName'),
+                    success(res) {
+                        if (res.hasApp) {
+                            self.swan.showModal({
+                                content: '即将离开手机百度，打开'
+                                    + self.data.get('launchAppName'),
+                                success: res => {
+                                    if (res.confirm) {
+                                        self.launchApp(needDownload);
+                                    }
+                                }
+                            });
+                        }
+                        else {
+                            // 没安装app
+                            self.launchApp(needDownload);
+                        }
+                    },
+                    fail(err) {
+                        self.launchApp(needDownload);
+                    }
+                });
+            }
+        }
+        else {
+            self.dispatchEvent('binderror', {
+                detail: {
+                    errCode: LAUNCH_APP_NOT_VALID_CODE,
+                    errMsg: LAUNCH_APP_NOT_VALID_MSG
+                }
+            });
+        }
+    },
+
+    /**
+     * 调起/下载 app
+     *
+     * @param {boolean} needDownload 是否需要下载
+     */
+    launchApp(needDownload) {
+        let scheme = this.data.get('launchScheme');
+        let isIOS = this.swaninterface.boxjs.platform.isIOS();
+        this.boxjs.ui.open({
+            name: 'swan-app',
+            data: {
+                open: encodeURIComponent(scheme),
+                download: {
+                    url: isIOS
+                        ? this.data.get('downloadAppUrlIos') || ''
+                        : this.data.get('downloadAppUrlAndroid') || '',
+                    from: ''
+                },
+                url: isIOS
+                        ? this.data.get('downloadAppUrlIos') || ''
+                        : this.data.get('downloadAppUrlAndroid') || '', // ios有bug，暂时用此字段
+                isNeedDownload: needDownload,
+                invokAnyWay: true
+            }
+        }).catch(() => {
+            this.dispatchEvent('binderror', {
+                detail: {
+                    errCode: LAUNCH_APP_NO_APP_CODE,
+                    errMsg: LAUNCH_APP_NO_APP_MSG
+                }
+            });
+        });
     },
 
     // openSetting得二级函数
@@ -496,7 +604,7 @@ export default {
         const data = this.getParams();
         this.isInserted = true;
         this.args = data;
-        this.boxjs.button.insert({
+        this.boxjs.ui.open({
             name: 'swan-button',
             data
         }).catch(err => {
@@ -521,7 +629,7 @@ export default {
                     ...this.args
                 };
                 this.args = params;
-                this.boxjs.button.update({
+                this.boxjs.ui.update({
                     name: 'swan-button',
                     data: params
                 }).catch(err => {
@@ -544,7 +652,7 @@ export default {
             };
             this.isInserted = false;
             this.args = null;
-            this.boxjs.button.remove({
+            this.boxjs.ui.close({
                 name: 'swan-button',
                 data: this.getParams(true)
             }).catch(err => {

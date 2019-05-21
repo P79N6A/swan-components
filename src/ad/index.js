@@ -7,8 +7,38 @@ import {loadScript} from './loader.js';
 import './index.css';
 
 const staticParams = {
-    adRenderLocked: false
+    adRenderLocked: false,
+    adLogVersion: 2
 };
+
+function sendLog(ad, logType) {
+    let backend = ad.data.get('backend');
+    let system;
+    let SDKVersion;
+    let version;
+    if (ad.swan.canIUse('getSystemInfoSync')) {
+        let systemInfo = ad.swan.getSystemInfoSync();
+        system = systemInfo.system;
+        SDKVersion = systemInfo.SDKVersion;
+        version = systemInfo.version;
+    }
+    if (backend === 'zhidao' || backend === 'jingyan') {
+        let url = 'https://eclick.baidu.com/se.jpg';
+        ad.swan.request({
+            url: url,
+            data: {
+                source: 'miniAPP',
+                type: logType,
+                backend: backend,
+                v: staticParams.adLogVersion,
+                osV: system,
+                sdkV: SDKVersion,
+                hostV: version,
+                t: Date.now()
+            }
+        });
+    }
+}
 
 export default {
     behaviors: ['userTouchEvents', 'noNativeBehavior'],
@@ -57,6 +87,7 @@ export default {
 
     attached() {
         let ad = this;
+        sendLog(ad, 'attached');
         let context = 'undefined' !== typeof self ? self : window;
         // 如果当前页面广告请求已经被锁，则等待
         if (staticParams.adRenderLocked) {
@@ -74,7 +105,9 @@ export default {
         else {
             staticParams.adRenderLocked = true;
             let t = new Date().getTime();
+            sendLog(ad, 'JSLoading');
             loadScript('https://cpro.baidustatic.com/cpro/xcx/js/ad-render.min.js?t=' + t, function () {
+                sendLog(ad, 'JSLoaded');
                 staticParams.adRenderLocked = false;
                 context.adRender.call(ad, staticParams);
             });

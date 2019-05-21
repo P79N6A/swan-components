@@ -6,7 +6,7 @@
 export default {
 
     bindWebViewEvents() {
-        const catchEvents = ['onUnload', 'shareAction'];
+        const catchEvents = ['onUnload', 'beforeShare'];
         this._pageLifeCycleEventEmitter.onMessage('PagelifeCycle', event => {
             if (!~catchEvents.indexOf(event.params.eventName)) {
                 return;
@@ -17,7 +17,7 @@ export default {
                     this.privateMethod.webviewEventsDispatch.call(this, {
                         webviewId: item,
                         eType: 'message',
-                        doNotClear: event.params.eventName === 'shareAction'
+                        doNotClear: event.params.eventName === 'beforeShare'
                     });
                 });
             }

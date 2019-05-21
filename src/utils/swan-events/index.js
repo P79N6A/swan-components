@@ -1,7 +1,4 @@
-/**
- * @file tace打点
- */
-import EventsEmitter from '../events-emitter';
+import EventsEmitter from '@baidu/events-emitter';
 
 const global = window;
 global.swanEvents = global.swanEvents || new EventsEmitter();

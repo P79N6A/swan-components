@@ -7,7 +7,8 @@ import {sanComponentWalker, datasetFilter} from './index';
 // 获取默认绑定的事件集合
 const normalEventList = [
     'touchstart', 'touchmove',
-    'touchend', 'touchcancel'
+    'touchend', 'touchcancel',
+    'tapevent', 'longtapevent'
 ];
 
 // 用户绑定的H5手势事件集合
@@ -34,6 +35,10 @@ export const eventProxyAnode = san => san.parseTemplate(`<a
     on-touchend="capture:onTouchEnd($event, true)"
     on-touchcancel="onTouchcancel($event)"
     on-touchcancel="capture:onTouchcancel($event, true)"
+    on-tapevent="onTapevent($event, false)"
+    on-tapevent="capture:onTapevent($event, true)"
+    on-longtapevent="onlongTapevent($event, false)"
+    on-longtapevent="capture:onlongTapevent($event, true)"
     on-contextmenu="onContextmenu($event)"
 ></a>`);
 

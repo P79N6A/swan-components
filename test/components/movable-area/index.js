@@ -65,7 +65,7 @@ describe('component' + '[' + COMPONENT_NAME + ']', () => {
                                 identifier: 10001,
                                 target: target,
                                 ...touchInits
-                            }),
+                            })
                         ],
                         bubbles: true
                     }
@@ -73,28 +73,6 @@ describe('component' + '[' + COMPONENT_NAME + ']', () => {
                 return event;
             }
 
-            it('preventEvents should be executed on touchstart', done => {
-                const pageX = 6;
-                const screenX = 10;
-                component.data.set('scaleArea', true);
-                const touchStartEvent = createTouchEvent(
-                    'touchstart',
-                    {
-                        clientX: pageX,
-                        pageX: pageX,
-                        screenX: screenX
-
-                    },
-                    movableAreaElement
-                );
-                const stub = sinon.stub(component, 'preventEvents');
-                movableAreaElement.dispatchEvent(touchStartEvent);
-                component.nextTick(() => {
-                    expect(stub.calledOnce).toBe(true);
-                    stub.restore();
-                    done();
-                });
-            });
             it('communicatorView should  be executed on touchMove', done => {
                 const data = component.data;
                 data.set('scaleArea', true);
@@ -119,9 +97,18 @@ describe('component' + '[' + COMPONENT_NAME + ']', () => {
                     },
                     movableAreaElement
                 );
+                const touchEndEvent = createTouchEvent(
+                    'touchend',
+                    {
+                        clientX: movePageX,
+                        pageX: movePageX
+                    },
+                    movableAreaElement
+                );
                 const spy = sinon.spy(component, 'communicatorView');
                 movableAreaElement.dispatchEvent(touchStartEvent);
                 movableAreaElement.dispatchEvent(touchMoveEvent);
+                movableAreaElement.dispatchEvent(touchEndEvent);
                 component.nextTick(() => {
                     expect(spy.calledOnce).toBe(false);
                     spy.restore();

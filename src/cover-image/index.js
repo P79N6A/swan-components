@@ -5,6 +5,8 @@
 import style from './index.css';
 import {isEqualObject, getTransitionParams, privateKey, absolutePathResolver} from '../utils';
 import {internalDataComputedCreator, typesCast} from '../computedCreator';
+import {STABILITY_LOG_CONFIG} from '../utils/constant';
+import {handleVideoFullscreenChangeMessage} from '../utils/na-comp';
 
 export default {
 
@@ -69,6 +71,9 @@ export default {
 
     attached() {
         this.communicator.onMessage('fullscreenchange', message => {
+            // 对于 ios 同层渲染，全屏时候需要把其它非本视频的 na 组件隐藏掉
+            handleVideoFullscreenChangeMessage(this, message);
+
             this.updateNativeCoverImage();
         });
         // 响应客户端派发到 slave 的事件
@@ -99,6 +104,7 @@ export default {
             finish: {type: 'load', bind: 'bindload'},
             error: {type: 'error', bind: 'binderror'}
         })[data.loadState];
+        eventType.type === 'error' && this.logStability(STABILITY_LOG_CONFIG.coverImageBindError);
         eventType && this.dispatchEvent(eventType.bind, {
             detail: {}
         });
@@ -151,7 +157,7 @@ export default {
                         ...params
                     };
                     this.insertNativeCover({
-                        name: 'coverimage',
+                        name: 'coverImage',
                         params
                     }).then(() => {
                         // 通知其它组件需要更新 NA 视图
@@ -159,6 +165,7 @@ export default {
                     }).catch(() => {
                         this.isInserted = false;
                         this.args = null;
+                        this.logStability(STABILITY_LOG_CONFIG.coverImageInsertError);
                     });
                 });
             }).catch(e => {
@@ -177,16 +184,12 @@ export default {
                 ...this.args
             };
             if (!isEqualObject(params, this.args)) {
-                // TODO 临时兼容src字段增量下发，后续需要统一所有NA组件upadte字段下发逻辑
-                if (params.src === this.args.src) {
-                    delete params.src;
-                }
                 this.args = {
                     ...params,
                     src: this.args.src
                 };
                 this.updateNativeCover({
-                    name: 'coverimage',
+                    name: 'coverImage',
                     params: {
                         ...params,
                         ...getTransitionParams(this.ref('computed'))
@@ -196,6 +199,7 @@ export default {
                     this.updateOtherComponents();
                 }).catch(() => {
                     this.args = originArgs;
+                    this.logStability(STABILITY_LOG_CONFIG.coverImageUpdateError);
                 });
             }
         };
@@ -203,7 +207,7 @@ export default {
             if (this.el && this.isInserted) {
                 this.preLoadImg().finally(() => {
                     this.nextTick(() => {
-                        afterImgLoaded();
+                        this.el && afterImgLoaded();
                     });
                 }).catch(e => {
                     console.warn(e);
@@ -223,7 +227,7 @@ export default {
             this.isInserted = false;
             this.args = null;
             this.removeNativeCover({
-                name: 'coverimage',
+                name: 'coverImage',
                 params: {
                     slaveId: `${this.slaveId}`,
                     viewId: `${this.data.get('id')}`,
@@ -232,6 +236,7 @@ export default {
             }).catch(() => {
                 this.isInserted = true;
                 this.args = originArgs;
+                this.logStability(STABILITY_LOG_CONFIG.coverImageRemoveError);
             });
         }
     },

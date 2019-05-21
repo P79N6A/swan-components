@@ -10,6 +10,7 @@ import buildComponent from '../../mock/swan-core/build-component';
 import componentBaseFieldCheck from '../../utils/component-base-field-check';
 import attach2Document from '../../utils/attach-to-document';
 import {getComponentClass,getFactory} from '../../mock/swan-core/build-component';
+import {createSingleTouchEvent} from '../../utils/touch';
 
 const COMPONENT_NAME = 'scroll-view';
 const sleep = milliseconds => {
@@ -73,6 +74,7 @@ describe(`component [${COMPONENT_NAME}]`, () => {
             it('should scrollTop change be watched', done => {
                 const scrollTopChangedSpy = sinon.spy(component, 'scrollTopChanged');
                 component.data.set('scrollTop', 1);
+
                 component.nextTick(() => {
                     expect(scrollTopChangedSpy.calledOnce).toBe(true);
                     scrollTopChangedSpy.restore();
@@ -96,6 +98,24 @@ describe(`component [${COMPONENT_NAME}]`, () => {
                 component.nextTick(() => {
                     expect(scrollIntoViewChangedSpy.called).toBe(true);
                     scrollIntoViewChangedSpy.restore();
+                    done();
+                });
+            });
+            it('should scrollX change be watched', done => {
+                const scrollXChangedSpy = sinon.spy(component, 'scrollXChanged');
+                component.data.set('scrollX', 'view');
+                component.nextTick(() => {
+                    expect(scrollXChangedSpy.called).toBe(true);
+                    scrollXChangedSpy.restore();
+                    done();
+                });
+            });
+            it('should scrollY change be watched', done => {
+                const scrollYChangedSpy = sinon.spy(component, 'scrollYChanged');
+                component.data.set('scrollY', 'view');
+                component.nextTick(() => {
+                    expect(scrollYChangedSpy.called).toBe(true);
+                    scrollYChangedSpy.restore();
                     done();
                 });
             });
@@ -135,7 +155,7 @@ describe(`component [${COMPONENT_NAME}]`, () => {
                     properties
                 );
                 const TestView = factory.getComponents('horizontal-view');
-               
+
                 let testView = null;
                 let scrollView = null;
                 beforeEach(() => {
@@ -316,6 +336,147 @@ describe(`component [${COMPONENT_NAME}]`, () => {
                     ).toBe(true);
                 });
             });
+            describe('check scroll touch events', () => {
+                let component = buildComponent(COMPONENT_NAME, ScrollView);
+                let $component = attach2Document(component);
+                let scrollElement = $component.querySelector('.scroll-view-compute-offset');
+                it('should not springback on touchstart', done => {
+                    const pageX = scrollElement.offsetLeft;
+                    const pageY = scrollElement.offsetTop;
+                    const isIOS = sinon.spy(component.boxjs.platform, 'isIOS');
+                    const spy = sinon.spy(component.boxjs.ui, 'close');
+                    isIOS() && component.data.set('scrollX', true);
+                    isIOS() && component.data.set('scrollY', true);
+                    createSingleTouchEvent(scrollElement, [{x: 0, y: 0},{x: pageX, y: pageY}]).then(() => {
+                        component.startPageX = pageX;
+                        component.startPageY = pageY;
+                        component.nextTick(() => {
+                            expect(spy.calledOnceWith(sinon.match.has('name', 'swan-springback'))).toBe(true);
+                            spy.restore();
+                            component.dispose();
+                            done();
+                        });
+                    });
+                });
+            });
+
+            describe('verify scroll event', () => {
+                const ScrollViewComponent = getComponentClass(COMPONENT_NAME, ScrollView);
+                const factory = getFactory();
+                const properties = {
+                    classProperties: {
+                        superClass: View,
+                        components: {
+                            'scroll-view': ScrollViewComponent
+                        }
+                    }
+                };
+
+                describe('verify horizal scroll', () => {
+                    factory.componentDefine(
+                        'horizontal-view',
+                        {
+                            template: `
+                                <test-view tabindex="-1">
+                                    <scroll-view s-ref="scrollView"
+                                        scroll-left="50"
+                                        scroll-x="true"
+                                        style="width:500px;height:100px">
+                                            <div id="content1" style="height: {{height}}px; width: 300px; background-color: green;">
+                                                I can scroll!
+                                            </div>
+                                    </scroll-view>
+                                </test-view>
+                            `,
+                            initData() {
+                                return {
+                                    height: 200
+                                };
+                            }
+                        },
+                        properties
+                    );
+                    const TestView = factory.getComponents('horizontal-view');
+
+                    let testView = new TestView();
+                    testView.attach(document.body);
+                    let scrollView = testView.ref('scrollView');
+                    const spy = sinon.spy(scrollView, 'scrollXChanged');
+
+                    it('test', done => {
+                        scrollView.nextTick(() => {
+                            testView.data.set('height', 400);
+                            component.communicator.fireMessage({
+                                type: 'slaveUpdated'
+                            });
+                            expect(spy.callCount).toBe(1);
+                            testView.dispose();
+                            done();
+                        });
+                    });
+                });
+            });
+
+            describe('scroll transitionend and slaveUpdated', () => {
+                const ScrollViewComponent = getComponentClass(
+                    COMPONENT_NAME,
+                    ScrollView
+                );
+                const factory = getFactory();
+                const properties = {
+                    classProperties: {
+                        superClass: View,
+                        components: {
+                            'scroll-view': ScrollViewComponent
+                        }
+                    }
+                };
+
+                describe('transition', () => {
+                    factory.componentDefine(
+                        'horizontal-view',
+                        {
+                            template: `
+                                <test-view tabindex="-1">
+                                    <scroll-view s-ref="scrollView"
+                                        scrollWithAnimation="true"
+                                        scroll-left="50"
+                                        scroll-x="true"
+                                        style="width:100px;height:100px; transition: all .1s ease; ">
+                                            <div id="content1" style="transition: all .1s ease; height: 100px; width: {{width}}px; background-color: green;">
+                                                I can scroll!
+                                            </div>
+                                    </scroll-view>
+                                </test-view>
+                            `,
+                            initData() {
+                                return {
+                                    width: 200
+                                };
+                            }
+                        },
+                        properties
+                    );
+                    const TestView = factory.getComponents('horizontal-view');
+
+                    let testView = new TestView();
+                    testView.attach(document.body);
+                    let scrollView = testView.ref('scrollView');
+                    const spy = sinon.spy(scrollView, 'scrollXChanged');
+
+                    it('test', done => {
+                        setTimeout(() => {
+                            testView.data.set('width', 400);
+                            component.communicator.fireMessage({
+                                type: 'slaveUpdated'
+                            });
+                            expect(1).toBe(1);
+                            testView.dispose();
+                            done();
+                        }, 1000);
+                    });
+                });
+            });
         });
     });
 });
@@ -331,5 +492,5 @@ function assertScrollEvent(deltaX, deltaY, scrollTop, scrollLeft) {
                     .and(sinon.match.has('scrollTop', scrollTop))
                     .and(sinon.match.has('scrollLeft', scrollLeft))
             )
-        
+
 }

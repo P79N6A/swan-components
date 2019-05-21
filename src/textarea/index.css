@@ -10,36 +10,16 @@ swan-textarea[hidden] {
     display: none;
 }
 
-swan-textarea textarea {
-    border: none;
-    padding: 0;
-    resize: none;
-    background-color: transparent;
-    line-height: 1.2;
-    z-index: 2;
-    position: absolute;
-    font-family: inherit;
-    background: transparent;
-    box-sizing: border-box;
-}
-
-swan-textarea .compute {
-    color: transparent;
-    top: 0;
-    z-index: 0;
-}
-
 swan-textarea div {
     word-break: break-all;
     line-height: 1.2;
     font-family: inherit;
-    /* position: absolute; */
     box-sizing: border-box;
-    color: #333;
+    color: #ccc;
+    white-space: inherit;
 }
 
-swan-textarea .textarea-placeholder {
-    color: #ccc;
+swan-textarea .swan-textarea-main {
     margin-top: 1px;
 }
 

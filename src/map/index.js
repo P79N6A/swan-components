@@ -5,9 +5,10 @@
  *         sunbaixin(sunbaixin@baidu.com)
  */
 import style from './index.css';
-import {attrValBool, isEqualObject, privateKey, COMPONENT_STATE} from '../utils';
+import {attrValBool, isEqualObject, privateKey, COMPONENT_STATE, isArray} from '../utils';
 import {getElementBox} from '../utils/dom';
 import {internalDataComputedCreator, typesCast} from '../computedCreator';
+import cloneDeep from 'lodash.clonedeep';
 
 export default {
     constructor(props) {
@@ -81,7 +82,7 @@ export default {
     },
 
     attached() {
-        this.communicator.onMessage(`map_${this.data.get('id')}`, event => {
+        this.communicator.onMessage(`map_${this.id}`, event => {
             this.dispatchNaEvent(event.params.action, event.params.e);
         });
     },
@@ -96,9 +97,11 @@ export default {
     },
 
     getMapParams() {
-        let mapData = this.data.get();
+        let originalMapData = this.data.get();
+        let mapData = cloneDeep(originalMapData);
+        mapData = this.transfromIconPath(mapData);
         let data = Object.assign({}, mapData, {
-            mapId: mapData.id,
+            mapId: this.id,
             slaveId: this.slaveId,
             position: getElementBox(this.el),
             hide: mapData.__hidden,
@@ -115,14 +118,28 @@ export default {
         return data;
     },
 
+    /**
+     * iconPath 支持相对路径
+     *
+     * @param {Object} mapData 用户输入数据
+     * @return {Object} 处理过iconPath后的数据
+     */
+    transfromIconPath(mapData) {
+        isArray(mapData.controls) && mapData.controls.forEach(item => {
+            item.iconPath && (item.iconPath = this.absolutePathResolve(item.iconPath));
+        });
+        isArray(mapData.markers) && mapData.markers.forEach(item => {
+            item.iconPath && (item.iconPath = this.absolutePathResolve(item.iconPath));
+        });
+        return mapData;
+    },
+
     openMap() {
         let mapParams = this.getMapParams();
         this.args = {...mapParams};
-        this.boxjs.map.operate({
-            type: 'create',
-            data: mapParams
-        }).then(() => {
-            this.sendStateChangeMessage('map', COMPONENT_STATE.INSERT, this.data.get('id'));
+
+        this.boxjs.map.insert(mapParams).then(() => {
+            this.sendStateChangeMessage('map', COMPONENT_STATE.INSERT, this.data.get('id'), this.id);
         }).catch(err => {
             console.warn(`map open fail! , ${JSON.stringify(err)}`);
         });
@@ -140,25 +157,19 @@ export default {
                 mapParams.latitude = null;
             }
             this.args = mapParams;
-            this.boxjs.map.operate({
-                type: 'update',
-                data: mapParams
-            }).catch(err => {
+            this.boxjs.map.update(mapParams).catch(err => {
                 console.warn(`map update fail! , ${JSON.stringify(err)}`);
             });
         }
     },
 
     removeMap() {
-        this.boxjs.map.operate({
-            type: 'remove',
-            data: {
-                slaveId: this.slaveId,
-                mapId: this.data.get('id')
-            }
+        this.boxjs.map.remove({
+            slaveId: this.slaveId,
+            mapId: this.id
         }).then(res => {
             this.args = null;
-            this.sendStateChangeMessage('map', COMPONENT_STATE.REMOVE, this.data.get('id'));
+            this.sendStateChangeMessage('map', COMPONENT_STATE.REMOVE, this.data.get('id'), this.id);
         }).catch(err => {
             console.warn(`map remove fail! , ${JSON.stringify(err)}`);
         });

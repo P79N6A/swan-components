@@ -75,6 +75,14 @@ export default {
         pageData.__scrollIntoView && this.scrollIntoViewChanged();
         pageData.__scrollLeft && this.scrollLeftChanged();
         pageData.__scrollTop && this.scrollTopChanged();
+
+        this.communicator.onMessage('fullscreenchange', message => {
+            let data = message && message.data;
+            // 对于 ios 同层渲染，全屏时候需要禁用掉手势监听
+            this.isVideoFullscreen = data
+                && data.isVideoFullscreenChange
+                && data.isFullscreen;
+        });
     },
 
     /**
@@ -194,11 +202,20 @@ export default {
                 const mainScroll = this.main.getBoundingClientRect();
                 if (pageData.__scrollX) {
                     const scrollLeft = this.main.scrollLeft + targetScroll.left - mainScroll.left;
-                    pageData.__scrollWithAnimation ? this.scrollTo(scrollLeft, 'x') : this.main.scrollLeft = scrollLeft;
+                    // 组件是从上到下依次渲染，scroll-view下方dom结构会影响其高度，需要放到nextTick中
+                    this.nextTick(() => {
+                        pageData.__scrollWithAnimation
+                            ? this.scrollTo(scrollLeft, 'x')
+                            : this.main.scrollLeft = scrollLeft;
+                    });
                 }
                 if (pageData.__scrollY) {
                     const scrollTop = this.main.scrollTop + targetScroll.top - mainScroll.top;
-                    pageData.__scrollWithAnimation ? this.scrollTo(scrollTop, 'y') : this.main.scrollTop = scrollTop;
+                    this.nextTick(() => {
+                        pageData.__scrollWithAnimation
+                            ? this.scrollTo(scrollTop, 'y')
+                            : this.main.scrollTop = scrollTop;
+                    });
                 }
             }
         }
@@ -348,6 +365,10 @@ export default {
      * @param {Object} [$event] DOM事件对象
      */
     onScroll($event) {
+        if (this.isVideoFullscreen) {
+            return;
+        }
+
         $event.preventDefault();
         $event.stopPropagation();
         if ($event.timeStamp - this.lastScrollTime < 20) { // 防止频繁计算导致卡顿问题
@@ -376,6 +397,10 @@ export default {
     },
 
     onScrollViewTouchStart($event) {
+        if (this.isVideoFullscreen) {
+            return;
+        }
+
         const touch = $event.changedTouches[0];
         this.startPageX = touch.pageX;
         this.startPageY = touch.pageY;
@@ -390,7 +415,8 @@ export default {
         this.swaninterface.boxjs.platform.isIOS() && this.boxjs.ui.close({
             name: 'swan-springback'
         });
-        this.boxjs.ui.open({
+        // 阻止 android 端下拉刷新
+        this.swaninterface.boxjs.platform.isAndroid() && this.boxjs.ui.open({
             name: 'swan-preventPullDownRefresh',
             data: {
                 prevent: true,
@@ -400,6 +426,10 @@ export default {
     },
 
     onScrollViewTouchMove($event) {
+        if (this.isVideoFullscreen) {
+            return;
+        }
+
         const touch = $event.changedTouches[0];
         // 触发layout ios下 fixed scroll卡死的问题 patch
         if (this.swaninterface.boxjs.platform.isIOS() && this.data.get('__scrollX') && this.direction === 'x') {
@@ -415,12 +445,17 @@ export default {
     },
 
     onScrollViewTouchEnd($event) {
+        if (this.isVideoFullscreen) {
+            return;
+        }
+
         this.direction = '';
         // 开启ios webview回弹效果
         this.swaninterface.boxjs.platform.isIOS() && this.boxjs.ui.open({
             name: 'swan-springback'
         });
-        this.boxjs.ui.open({
+        // 开启 android 端下拉刷新
+        this.swaninterface.boxjs.platform.isAndroid() && this.boxjs.ui.open({
             name: 'swan-preventPullDownRefresh',
             data: {
                 prevent: false,

@@ -7,6 +7,8 @@
 import sinon from 'sinon';
 import Radio from '../../../src/radio';
 import RadioGroup from '../../../src/radio-group';
+import Form from '../../../src/form/index';
+import Button from '../../../src/button/index';
 import buildComponent from '../../mock/swan-core/build-component';
 import componentBaseFieldCheck from '../../utils/component-base-field-check';
 import attach2Document from '../../utils/attach-to-document';
@@ -19,27 +21,34 @@ const COMPONENT_NAME = 'radio';
  *
  * @param {Function} callback 回调函数
  */
-export const getTestCase = callback => {
+export const getTestCase = (callback, buttonType = 'submit') => {
     const factory = getFactory();
     const componentRadioGroup = getComponentClass('radio-group', RadioGroup);
     const componentRadio = getComponentClass(COMPONENT_NAME, Radio);
+    const componentForm = getComponentClass('form', Form);
+    const componentButton = getComponentClass('button', Button);
     const properties = {
         classProperties: {
             components: {
                 'radio-group': componentRadioGroup,
-                'radio': componentRadio
+                'radio': componentRadio,
+                'form': componentForm,
+                'button': componentButton
             }
         }
     };
     factory.componentDefine(
         'testComponent', {
             template: `
-                <view>
-                    <radio-group s-ref="radioGroup">
-                        <radio s-ref="radio1" value="radio1" checked />
-                        <radio s-ref="radio2" value="radio2" />
-                    </radio-group>
-                </view>`
+                <swan-page>
+                    <form>
+                        <radio-group s-ref="radioGroup">
+                            <radio name="radio1" s-ref="radio1" value="radio1" checked />
+                            <radio name="radio2" s-ref="radio2" value="radio2" />
+                        </radio-group>
+                        <button form-type="${buttonType}" s-ref="button">button</button>
+                    </form>
+                </swan-page>`
         },
         properties
     );
@@ -50,10 +59,12 @@ export const getTestCase = callback => {
         const radioGroup = testComponent.ref('radioGroup');
         const radio1 = testComponent.ref('radio1');
         const radio2 = testComponent.ref('radio2');
+        const button = testComponent.ref('button');
         callback({
             radioGroup,
             radio1,
-            radio2
+            radio2,
+            button
         });
         testComponent.dispose();
     });
@@ -172,24 +183,29 @@ describe(`component [${COMPONENT_NAME}]`, () => {
 
         it('should dispatch "radio:removed" when use in radio-group and detached', done => {
             getTestCase(options => {
-                const {radioGroup, radio1} = options;
+                const {radioGroup, radio1, button} = options;
+                button.fire('bindtap');
+
                 expect(radioGroup.checkedId).toBe(radio1.id);
                 expect(radioGroup.value).toBe(radio1.data.get('value'));
                 radio1.detached();
                 expect(radioGroup.checkedId).toBe(null);
                 expect(radioGroup.value).toBe('');
                 done();
-            });
+            }, 'submit');
         });
 
         it('should dispatch "radio:checked" and "radio:checkedChanged" when enabled and used in radio-group', () => {
             getTestCase(options => {
-                const {radioGroup, radio1, radio2} = options;
+                const {radioGroup, radio1, radio2, button} = options;
+
                 expect(radioGroup.checkedId).toBe(radio1.id);
                 const event = new Event('click');
                 radio2.el.dispatchEvent(event);
                 expect(radioGroup.checkedId).toBe(radio2.id);
-            });
+                button.fire('bindtap');
+                expect(radioGroup.checkedId).toBe(null);
+            }, 'reset');
         });
     });
 

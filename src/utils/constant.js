@@ -19,3 +19,36 @@ export const COMPONENT_STATE = {
 export const TOUCH_EVENTS_NAME = ['bindtouchstart', 'bindtouchmove',
 'bindtouchend', 'bindtouchcancel', 'bindtap',
 'bindlongpress', 'bindlongtap', 'bindtouchforcechange'];
+
+/**
+ * 组件稳定性打点 http://agroup.baidu.com/box/md/article/1609374
+ */
+export const STABILITY_LOG_CONFIG = {
+    videoOpenError: 'videoOpenError',
+    videoUpdateError: 'videoUpdateError',
+    videoRemoveError: 'videoRemoveError',
+    videoBindError: 'videoBindError',
+    videoInsertContainerError: 'videoInsertContainerError',
+    videoUpdateContainerError: 'videoUpdateContainerError',
+
+    animationViewInsertError: 'animationViewInsertError',
+    animationViewUpdateError: 'animationViewUpdateError',
+    animationViewRemoveError: 'animationViewRemoveError',
+
+    livePlayerOpenError: 'livePlayerOpenError',
+    livePlayerUpdateError: 'livePlayerUpdateError',
+    livePlayerRemoveError: 'livePlayerRemoveError',
+    livePlayerBindError: 'livePlayerBindError',
+
+    coverImageInsertError: 'coverImageInsertError',
+    coverImageUpdateError: 'coverImageUpdateError',
+    coverImageRemoveError: 'coverImageRemoveError',
+    coverImageBindError: 'coverImageBindError',
+
+    webViewInsertError: 'webViewInsertError',
+    webViewUpdateError: 'webViewUpdateError',
+    webViewRemoveError: 'webViewRemoveError',
+
+    imageBindError: 'imageBindError' // h5 image bindError
+
+};

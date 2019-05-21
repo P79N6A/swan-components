@@ -110,7 +110,7 @@ export default {
             data: params
         }).then(res => {
             this.args = {...params};
-            this.sendStateChangeMessage('camera', COMPONENT_STATE.INSERT);
+            this.sendStateChangeMessage('camera', COMPONENT_STATE.INSERT, '', this.id);
         }).catch(e => {
             this.isInserted = false;
             this.dispatchErrorEvent(e.errCode, e.errMsg);
@@ -127,7 +127,7 @@ export default {
                 viewId: this.args.viewId,
             }
         }).then(res => {
-            this.sendStateChangeMessage('camera', COMPONENT_STATE.REMOVE);
+            this.sendStateChangeMessage('camera', COMPONENT_STATE.REMOVE, '', this.id);
         }).catch(res => {
             this.isInserted = true;
         });

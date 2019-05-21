@@ -9,7 +9,7 @@
  * @param {string} str - 需要转换的字符串
  * @return {Array} 清理之后的classList
  */
-export const strToArrSpliter = str => str.trim().split(' ').filter(item => item !== '');
+export const strToArr = str => str.trim().split(' ').filter(item => item !== '');
 
 /**
  * 添加自定义组件内层组件前缀

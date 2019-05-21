@@ -21,25 +21,33 @@ describe('component [' + COMPONENT_NAME + ']', () => {
     });
 
     it('should update Native component while slaveRenderd', done => {
-        const spy = sinon.spy(component.boxjs.media, 'arCamera');
+        const spy = sinon.spy(component.boxjs.media, 'ARCamera');
         component.el.style.top = '-1px';
         component.slaveUpdated();
         component.nextTick(() => {
             expect(spy.calledWith(sinon.match.has('type', sinon.match('update')))).toBe(true)
             spy.restore();
             done();
-        })
+        });
     });
 
     const component2 = buildComponent(COMPONENT_NAME, ARCamera);
     const $component2 = attach2Document(component2);
     componentBaseFieldCheck(COMPONENT_NAME, component2);
-    it('should remove Native component while detached', () => {
-        const spy = sinon.spy(component2.boxjs.media, 'arCamera');
-        component2.dispose();
-        spy.restore();
-        expect(spy.calledWith(sinon.match.has('type', sinon.match('remove')))).toBe(true)
-    });
 
-    
+    it('should trigger binderror event', done => {
+        const spy = sinon.spy(component, 'dispatchEvent');
+        component.communicator.fireMessage({
+            type: `ARCamera_${component.ARCameraId}`,
+            params: {
+                action: 'fullscreenchange',
+                e: {
+                    data: '{"fullscreen":"1", "width":"720", "height":"360", "videoId":"myde"}'
+                }
+            }
+        });
+        expect(spy.callCount).toBe(1);
+        spy.restore();
+        done();
+    });
 });

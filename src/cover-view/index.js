@@ -5,6 +5,7 @@
 import styleIndex from './index.css';
 import {isEqualObject, getTransitionParams, privateKey} from '../utils';
 import {internalDataComputedCreator, typesCast} from '../computedCreator';
+import {handleVideoFullscreenChangeMessage} from '../utils/na-comp';
 
 export default {
 
@@ -54,7 +55,7 @@ export default {
     created() {
         this.nextTick(() => {
             // cover-view 的 dom 节点本身不用响应 transition 动画，在插入贴片前需要设置 transition-property 为 none
-            this.el && ['transition-property', '-webkit-transition-property'].map(key => {
+            this.el && ['transition-property', '-webkit-transition-property'].forEach(key => {
                 this.el.style.setProperty(key, 'none', 'important');
             });
             this.insertNativeCoverView();
@@ -70,6 +71,9 @@ export default {
         $container.style.display = 'inherit';
 
         this.communicator.onMessage('fullscreenchange', message => {
+            // 对于 ios 同层渲染，全屏时候需要把其它非本视频的 na 组件隐藏掉
+            handleVideoFullscreenChangeMessage(this, message);
+
             this.updateNativeCoverView();
         });
 

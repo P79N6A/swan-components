@@ -12,6 +12,7 @@ import WebView from './web-view';
 import ScrollView from './scroll-view';
 import Navigator from './navigator';
 import Input from './input';
+// import InputIos from './input-ios';
 import Textarea from './textarea';
 import Button from './button';
 import Swiper from './swiper';
@@ -29,6 +30,8 @@ import Checkbox from './checkbox';
 import CheckboxGroup from './checkbox-group';
 import LivePlayer from './live-player';
 import Video from './video';
+import VideoIos from './video-ios';
+import VideoAndroid from './video-android';
 import Radio from './radio';
 import RadioGroup from './radio-group';
 import Switch from './switch';
@@ -42,11 +45,38 @@ import AnimationView from './animation-view';
 import Arcamera from './ar-camera';
 import Page from './page';
 import Ad from './ad';
+import AdFc from './ad-fc';
 import {behavior} from './behaviorDecorators';
 import SwanComponent from './swan-component';
 import SuperCustomComponent from './super-custom-component';
 import TrackLog from './track-log';
 import Mask from './mask';
+import {getABSwitchValue} from './utils/abtest';
+
+/**
+ * 判断当前是否启用了同层渲染 video 组件，转全后，这个逻辑可以去掉
+ *
+ * @inner
+ * @return {boolean}
+ */
+function isEnableSameLayerVideo() {
+    let switchValue = getABSwitchValue('swanswitch_same_layer_video');
+    return switchValue && parseInt(switchValue, 10) === 1;
+}
+
+/**
+ * 获取运行时要使用的 Video 组件
+ *
+ * @inner
+ * @return {Object}
+ */
+function getVideoComponent(environment) {
+    if (isEnableSameLayerVideo()) {
+        return environment.isIOS ? VideoIos : VideoAndroid;
+    }
+
+    return Video;
+}
 
 export const getComponents = environment => {
     return {
@@ -59,7 +89,7 @@ export const getComponents = environment => {
         'scroll-view': ScrollView,
         'web-view': WebView,
         'navigator': Navigator,
-        'input': Input,
+        'input': Input, // environment.isIOS ? InputIos : Input,
         'textarea': Textarea,
         'cover-image': CoverImage,
         'button': Button,
@@ -77,7 +107,7 @@ export const getComponents = environment => {
         'checkbox': Checkbox,
         'checkbox-group': CheckboxGroup,
         'live-player': LivePlayer,
-        'video': Video,
+        'video': getVideoComponent(environment),
         'radio': Radio,
         'radio-group': RadioGroup,
         'switch': Switch,
@@ -89,6 +119,7 @@ export const getComponents = environment => {
         'open-data': OpenData,
         'animation-view': AnimationView,
         'ad': Ad,
+        'ad-fc': AdFc,
         'ar-camera': Arcamera,
         'super-page': Page,
         'super-custom-component': SuperCustomComponent,

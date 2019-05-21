@@ -10,6 +10,7 @@ import buildComponent from '../../mock/swan-core/build-component';
 import componentBaseFieldCheck from '../../utils/component-base-field-check';
 import attach2Document from '../../utils/attach-to-document';
 import {getComponentClass, getFactory} from '../../mock/swan-core/build-component';
+import Communicator from "../../mock/communicator";
 
 const COMPONENT_NAME = 'textarea';
 
@@ -134,14 +135,17 @@ describe('component' + '[' + COMPONENT_NAME + ']', () => {
                         ['selectionStart', '-1'],
                         ['selectionEnd', true]
                     ];
+
                     attrWatch.forEach(([prop, val]) => {
                         component2.data.set(prop, val);
                         component2.communicator.fireMessage({
                             type: 'slaveUpdated'
                         });
                     });
+                    component2.isFocus = true;
+                    component2.updateTextarea();
                     component2.nextTick(() => {
-                        expect(spy.callCount).toEqual(attrWatch.length);
+                        expect(spy.callCount).toEqual(attrWatch.length + 1);
                         spy.restore();
                         component2.dispose();
                         done();
@@ -176,6 +180,7 @@ describe('component' + '[' + COMPONENT_NAME + ']', () => {
             });
         });
 
+
         const component4 = buildComponent(COMPONENT_NAME, Textarea);
         attach2Document(component4);
         it('should trigger bindinput while input', done => {
@@ -196,6 +201,122 @@ describe('component' + '[' + COMPONENT_NAME + ']', () => {
                     }
                 }));
             });
+        });
+        const component5 = buildComponent(COMPONENT_NAME, Textarea);
+        attach2Document(component5);
+        it('should trigger bindblur while input', done => {
+            component5.on('bindblur', e => {
+                expect(e.detail.value).toBe('test');
+                component5.dispose();
+                done();
+            });
+            component5.nextTick(() => {
+                window[component5.callbackName](JSON.stringify({
+                    data: {
+                        value: 'test',
+                        cursor: '',
+                        lineCount: 1,
+                        height: '10px',
+                        keyboardHeight: 0,
+                        eventName: 'blur'
+                    }
+                }));
+            });
+        });
+
+        const component6 = buildComponent(COMPONENT_NAME, Textarea);
+        attach2Document(component6);
+        it('should trigger bindconfirm while input', done => {
+            component6.on('bindconfirm', e => {
+                expect(e.detail.value).toBe('test');
+                component6.dispose();
+                done();
+            });
+            component6.nextTick(() => {
+                window[component6.callbackName](JSON.stringify({
+                    data: {
+                        value: 'test',
+                        cursor: '',
+                        lineCount: 1,
+                        height: '10px',
+                        keyboardHeight: 0,
+                        eventName: 'confirm'
+                    }
+                }));
+            });
+        });
+        const component7 = buildComponent(COMPONENT_NAME, Textarea);
+        attach2Document(component7);
+        it(' minHeight should be check  while linechange', done => {
+            let target = component7.el;
+            component7.on('bindlinechange', e => {
+                expect(e.detail.lineCount).toBe(3);
+                component7.dispose();
+                done();
+            })
+            component7.nextTick(() => {
+                window[component7.callbackName](JSON.stringify({
+                    data: {
+                        value: '',
+                        cursor: '',
+                        lineCount: 3,
+                        height: '1px',
+                        keyboardHeight: 0,
+                        eventName: 'linechange'
+                    }
+                }));
+            });
+        });
+        const component8 = buildComponent(COMPONENT_NAME, Textarea,{
+            data: {
+                autoHeight: true
+            }
+        });
+        attach2Document(component8);
+        it(' maxHeight should be check  while linechange', done => {
+
+            component8.on('bindlinechange', e => {
+                expect(e.detail.lineCount).toBe(3);
+                component8.dispose();
+                done();
+            });
+
+            component8.el.style.textAlign = 'end';
+            component8.el.style.height = '1px';
+            component8.el.style.border = 'none';
+            component8.el.style.fontWeight = 900;
+            component8.el.style.boxSizing = 'border-box';
+            component8.getFontWeight(null);
+            component8.nextTick(() => {
+                window[component8.callbackName](JSON.stringify({
+                    data: {
+                        value: '',
+                        cursor: '',
+                        lineCount: 3,
+                        height: '0px',
+                        keyboardHeight: 0,
+                        eventName: 'linechange'
+                    }
+                }));
+            });
+        });
+        const component9 = buildComponent(COMPONENT_NAME, Textarea,{
+            data: {
+                autoHeight: true
+            }
+        });
+        attach2Document(component9);
+        it(' this.el should be check ', done => {
+
+            let spy = sinon.spy(component9, 'getComputedStyle');
+            component9.el = null;
+            component9.getComputedStyle();
+            component9.nextTick(()=>{
+                expect(spy.callCount).toBe(1);
+                spy.restore();
+                done();
+            })
+
         });
     });
 
@@ -232,13 +353,34 @@ describe('component' + '[' + COMPONENT_NAME + ']', () => {
 
         const component3 = buildComponent(COMPONENT_NAME, Textarea, {
             data: {
-                name: 'myTextarea'
+                name: 'myTextarea',
+                autoHeight: true
             }
         });
         attach2Document(component3);
         component3.data.set('name', 'aaa');
+        component3.data.set('name', 'aaa');
+
+        it('should not fire message LabelFirstTapped while click label', done => {
+
+            let spy = sinon.spy(component3.communicator, 'fireMessage');
+            const event = new Event('click');
+            component3.dispatchEvent(event);
+            component3.communicator.fireMessage({
+                type: 'LabelTapped',
+                data: {
+                    labelForValue: component3.data.get('id')
+                }
+            });
+            expect(spy.callCount).toBe(1);
+            spy.restore();
+            done();
+        });
+
         it('insertTextArea will be executed when focus change', done => {
+
             component3.nextTick(() => {
+
                 expect(component3.name).toBe('aaa');
                 spy.restore();
                 component3.dispose();
@@ -248,8 +390,14 @@ describe('component' + '[' + COMPONENT_NAME + ']', () => {
     });
 
     describe('props type', () => {
-        const attrArr = ['autoHeight', 'hidden', 'autoFocus', 'disabled', 'focus', 'fixed', 'showConfirmBar', 'adjustPosition'];
-        const component = buildComponent(COMPONENT_NAME, Textarea);
+        const attrArr = ['autoHeight',
+            'hidden', 'autoFocus', 'disabled', 'focus', 'fixed', 'showConfirmBar', 'adjustPosition'];
+        const component = buildComponent(COMPONENT_NAME, Textarea,{
+            data: {
+                selectionStart: true,
+                selectionEnd: {}
+            }
+        });
         attach2Document(component);
         attrArr.forEach(name => {
             it(`__${name} should be boolean`, () => {

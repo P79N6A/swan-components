@@ -42,7 +42,9 @@ export default {
         ])
     },
 
-    template: `<swan-nav class="{{__privateClass}} swan-spider-tap">
+    template: `<swan-nav class="{{__privateClass}} swan-spider-tap"
+        href="{{__url || ''}}"
+    >
         <slot></slot>
     </swan-nav>`,
 
@@ -63,7 +65,8 @@ export default {
                         appid: __appId,
                         url: __path,
                         navi: 'naviTo', // 小程序间跳转
-                        extraData: this.data.get('extraData')
+                        extraData: this.data.get('extraData'),
+                        domId: this.uid
                     }).then(res => {
                         this.jumpMiniProgramCallback('success', 'navigateToMiniProgram:ok');
                     }).catch(err => {
@@ -80,7 +83,8 @@ export default {
                     eventParams: {
                         uri: this.data.get('__url'),
                         openType: this.data.get('__openType'),
-                        delta: this.data.get('__delta')
+                        delta: this.data.get('__delta'),
+                        domId: this.uid
                     }
                 });
             }

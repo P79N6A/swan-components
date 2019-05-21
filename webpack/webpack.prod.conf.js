@@ -26,7 +26,6 @@ module.exports = merge(
             filename: '[name].js',
             libraryTarget: 'umd'
         },
-        devtool: 'source-map',
         plugins: [
             new webpack.DefinePlugin({
                 'process.env': {

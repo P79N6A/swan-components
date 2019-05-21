@@ -6,6 +6,7 @@
 import style from './index.css';
 import {hexColor, isEqualObject, privateKey} from '../utils';
 import {internalDataComputedCreator, typesCast} from '../computedCreator';
+import {STABILITY_LOG_CONFIG} from '../utils/constant';
 
 export default {
 
@@ -119,6 +120,7 @@ export default {
                 this.isInserted = false;
                 this.args = null;
                 console.warn(`NAAnimView create fail! , ${JSON.stringify(err)}`);
+                this.logStability(STABILITY_LOG_CONFIG.animationViewInsertError);
             });
         }
     },
@@ -143,6 +145,7 @@ export default {
                 }).catch(err => {
                     this.args = originArgs;
                     console.warn(`NAAnimView update fail! , ${JSON.stringify(err)}`);
+                    this.logStability(STABILITY_LOG_CONFIG.animationViewUpdateError);
                 });
             }
         }
@@ -172,6 +175,7 @@ export default {
                 this.isInserted = true;
                 this.args = originArgs;
                 console.warn(`NAAnimView remove fail! , ${JSON.stringify(err)}`);
+                this.logStability(STABILITY_LOG_CONFIG.animationViewRemoveError);
             });
         }
     },

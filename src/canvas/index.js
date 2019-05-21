@@ -25,7 +25,7 @@ export default {
             {name: 'disableScroll', caster: typesCast.boolCast}
         ]),
         hiddenStyle() {
-            return this.data.get('__hidden') ? 'display:none;' : '';
+            return !this.data.get('__canvasId') || this.data.get('__hidden') ? 'display:none;' : '';
         },
 
         /**
@@ -50,6 +50,11 @@ export default {
 
     created() {
         this.nextTick(() => {
+            if (!this.data.get('__canvasId')) {
+                console.error('canvas-id is required');
+                return;
+            }
+
             this.setKeyAttribute(this.getKeyAttribute());
             this.insertCanvas();
             this.noticeSlaveEvents();
@@ -67,8 +72,12 @@ export default {
     },
 
     insertCanvas() {
-        this.boxjs.canvas.insert(this.getCanvasAttributes()).then(res => {
-            this.sendStateChangeMessage('canvas', COMPONENT_STATE.INSERT, this.canvasId);
+        this.boxjs.canvas.insert(this.getCanvasAttributes())
+        .then(res => {
+            this.sendStateChangeMessage('canvas', COMPONENT_STATE.INSERT, this.canvasId, this.id);
+        })
+        .catch(e => {
+            console.log('canvas insert error', e);
         });
     },
 
@@ -79,9 +88,9 @@ export default {
     removeCanvas() {
         this.boxjs.canvas.remove({
             slaveId: this.slaveId,
-            canvasId: this.canvasId
+            canvasId: this.id
         }).then(res => {
-            this.sendStateChangeMessage('canvas', COMPONENT_STATE.REMOVE, this.canvasId);
+            this.sendStateChangeMessage('canvas', COMPONENT_STATE.REMOVE, this.canvasId, this.id);
         });
     },
 
@@ -91,7 +100,7 @@ export default {
 
     getCanvasAttributes() {
         return {
-            canvasId: this.canvasId,
+            canvasId: this.id,
             slaveId: this.slaveId,
             hide: this.hide + '',
             disableScroll: this.disableScroll + '',
@@ -138,7 +147,7 @@ export default {
      * 接收客户端派发的事件，用于映射行为touchstart/touchmove等
      */
     noticeSlaveEvents() {
-        this.communicator.onMessage(`canvas_${this.canvasId}`, event => {
+        this.communicator.onMessage(`canvas_${this.id}`, event => {
             this.dispatchNaEvent(event.params.action, event.params.e);
         });
     }

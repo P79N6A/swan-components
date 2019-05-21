@@ -11,6 +11,7 @@ import attach2Document from '../../utils/attach-to-document';
 import button from '../../../src/button/index';
 import label from '../../../src/label/index';
 import view from '../../../src/view/index';
+import radio from '../../../src/radio/index';
 import {getComponentClass, getFactory} from '../../mock/swan-core/build-component';
 const COMPONENT_NAME = 'label';
 
@@ -31,13 +32,15 @@ describe('component [' + COMPONENT_NAME + ']', () => {
     const componentLabel = getComponentClass('label', label);
     const componentButton = getComponentClass('button', button);
     const componentView = getComponentClass('view', view);
+    const componentRadio = getComponentClass('radio', radio);
     const factory = getFactory();
     const properties = {
         classProperties: {
             components: {
                 label: componentLabel,
                 button: componentButton,
-                view: componentView
+                view: componentView,
+                radio: componentRadio
             }
         }
     };
@@ -84,6 +87,43 @@ describe('component [' + COMPONENT_NAME + ']', () => {
                     )
                 )
             ));
+
+            spy.restore();
+            done();
+        });
+    });
+
+    describe('disables while have SWAN-BUTTON, SWAN-CHECKBOX, SWAN-RADIO, SWAN-SWITCH in children', () => {
+
+        factory.componentDefine(
+            'swan-label',
+            {
+                template: `
+                <swan-page>
+                    <label s-ref='label'>
+                        <view s-ref="view">
+                            <radio s-ref='radio' disabled="{{true}}"/>
+                        </view>
+                        hello
+                    </label>
+                </swan-page>
+                `
+            },
+            properties
+        );
+        const TestView = factory.getComponents('swan-label');
+        const testview = new TestView();
+        testview.attach(document.body);
+        const labelComp = testview.ref('label');
+        const radioComp = testview.ref('radio');
+
+        it('should not fire message LabelFirstTapped on radio while click label', done => {
+            radioComp.el.disabled = true;
+            let spy = sinon.spy(labelComp.communicator, 'fireMessage');
+            let click = new Event('click');
+            labelComp.el.dispatchEvent(click);
+
+            expect(spy.callCount).toBe(0);
 
             spy.restore();
             done();

@@ -217,7 +217,7 @@ export default {
     privateGetUserInfo() {
         return new Promise((resolve, reject) => {
             this.boxjs.data.get({
-                name: 'swan-privateGetUserInfo',
+                name: 'swan-baidu.privateGetUserInfo',
                 data: {
                     callback(res) {
                         const resData = JSON.parse(res);

@@ -5,6 +5,7 @@
 import {attrValBool, privateKey, isEqualObject} from '../utils';
 import {getCustomEventMap} from '../utils/event';
 import {internalDataComputedCreator, typesCast} from '../computedCreator';
+import {STABILITY_LOG_CONFIG} from '../utils/constant';
 
 export default {
 
@@ -75,6 +76,7 @@ export default {
         .then()
         .catch(err => {
             console.log('webview-remove-fail: ', err);
+            this.logStability(STABILITY_LOG_CONFIG.webViewRemoveError);
         });
 
         this.dispatch('abilityMessage', {
@@ -131,6 +133,7 @@ export default {
         this.boxjs.webView.insert(this.getParams())
         .catch(err => {
             console.log('webview-insert-fail: ', err);
+            this.logStability(STABILITY_LOG_CONFIG.webViewInsertError);
         });
     },
 
@@ -141,6 +144,7 @@ export default {
         this.boxjs.webView.update(this.getParams())
         .catch(err => {
             console.log('webview-update-fail: ', err);
+            this.logStability(STABILITY_LOG_CONFIG.webViewUpdateError);
         });
     },
 

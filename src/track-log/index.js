@@ -2,9 +2,11 @@
  * @file bdml's file's base elements <TrackLog>
  * @author wangyang(wangyang02@baidu.com)
  */
+import style from './index.css';
 
 import {config} from './config';
 import {attrValBool} from '../utils';
+import getObserverInstance from '../utils/getObserverInstance';
 
 /**
  * 基础数据
@@ -33,7 +35,7 @@ export default {
 
     behaviors: ['userTouchEvents', 'noNativeBehavior', 'animateEffect'],
 
-    template: '<swan-track-log><slot></slot></swan-track-log>',
+    template: '<swan-track-log s-ref="trackEle"><slot></slot></swan-track-log>',
 
     initData() {
         return {
@@ -97,7 +99,9 @@ export default {
             return Promise.resolve(logData.networkType);
         }
 
-        return this.boxjs.device.networkType().then(res => logData.networkType = res.networkType);
+        return this.boxjs.device.networkType().then(res => {
+            logData.networkType = res.networkType;
+        });
     },
 
     /**
@@ -106,16 +110,14 @@ export default {
      * @param {Object} data 参数
      */
     trackEvent(data) {
-        if (!logData.mtjKey) {
-            try {
-                logData.mtjKey = this.swan.getStorageSync('mtj_key');
-                logData.uuid = this.swan.getStorageSync('mtj_uuid');
-            }
-            catch (e) {}
+        // 先从小程序存储中读取百度统计sdk写的mtj_key
+        if (!logData.keyData) {
+            logData.keyData = this.swan.getStorageSync('mtj_key');
+            logData.uuid = this.swan.getStorageSync('mtj_uuid');
         }
 
-        // 移动统计sdk获取mtjKey要访问手百的服务器，速度可能会比较慢，需要重试机制
-        if (!logData.mtjKey) {
+        // 移动统计sdk获取key要访问手百的服务器，速度可能会比较慢，需要重试机制
+        if (!logData.keyData) {
             setTimeout(() => this.trackEvent(data), config.getKeyRetryDelay);
             return;
         }
@@ -136,7 +138,9 @@ export default {
             dataType: 'text',
             data: Object.assign({
                 type: 0,
-                key: logData.mtjKey,
+                key: logData.keyData.bdstatistic_key,
+                officialNo: logData.keyData.official_no,
+                containerNo: logData.keyData.container_no,
                 uuid: logData.uuid,
                 appid: logData.appInfo.appid,
                 cuid: logData.appInfo.cuid,
@@ -253,21 +257,39 @@ export default {
      */
     checkVisibleDuration() {
         // 满足这些条件就直接返回：已经发过可视展现日志，或正在计时中，或当前不可视
-        if (this.isVisibleLogged || this.visibleTimer || !this.getVisibility()) {
+        if (this.isVisibleLogged) {
             return;
         }
 
-        // 开始监控可视展现时长
-        this.visibleTimer = setTimeout(() => {
-            if (this.getVisibility()) {
-                this.isVisibleLogged = true;
-                this.dispatch('visible');
-                this.sendTrackLogEvent('visible');
+        const visibilityObserver = getObserverInstance('track-log', {
+            threshold: [0, .5]
+        });
+
+        // this.enterTime = Date.now(); // 默认可见
+        visibilityObserver.observe(this.el, entry => {
+            const {
+                intersectionRatio,
+                isIntersecting,
+                time,
+                target
+            } = entry;
+
+            if (!this.starTime && intersectionRatio > 0.5) {
+                this.starTime = time;
             }
 
-            // 计时结束之后要清除visibleTimer，下次滚动时就可以重新开始检测
-            this.visibleTimer = 0;
-        }, this.visibleDuration);
+            if (!isIntersecting && this.starTime) {
+                if (time - this.starTime >= this.visibleDuration) {
+                    visibilityObserver.unobserve(target);
+                    this.isVisibleLogged = true;
+                    this.dispatch('visible');
+                    this.sendTrackLogEvent('visible');
+                }
+                else {
+                    this.starTime = 0;
+                }
+            }
+        });
     },
 
     compiled() {
@@ -332,17 +354,5 @@ export default {
 
         // 监控可视展现
         this.checkVisibleDuration();
-
-        /**
-         * 防抖的超时id
-         *
-         * @type {number}
-         */
-        let debounceTimeoutId;
-
-        window.addEventListener('scroll', () => {
-            clearTimeout(debounceTimeoutId);
-            debounceTimeoutId = setTimeout(() => this.checkVisibleDuration(), 100);
-        });
     }
 };

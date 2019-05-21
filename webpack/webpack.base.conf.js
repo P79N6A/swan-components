@@ -25,11 +25,35 @@ module.exports = {
                 })
             },
             {
+                test: /\.styl$/,
+                loader: ExtractTextPlugin.extract({
+                    fallback: 'style-loader',
+                    use: [
+                        {
+                            loader: 'css-loader',
+                            options: {
+                                modules: true,
+                                localIdentName: '[local]'
+                            }
+                        },
+                        {
+                            loader: 'postcss-loader',
+                            options: {
+                                plugins: () => [
+                                    require('autoprefixer')()
+                                ]
+                            }
+                        },
+                        'stylus-loader'
+                    ]
+                })
+            },
+            {
                 test: /\.(png|jpg|ttf|woff|eot|svg)$/,
                 loader: 'url-loader'
             },
             {
-                test: /\.(html)$/,
+                test: /\.(html|tpl)$/,
                 use: {
                     loader: 'html-loader',
                     options: {

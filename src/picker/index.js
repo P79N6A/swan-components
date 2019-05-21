@@ -217,7 +217,7 @@ export default {
      */
     renderDatePicker() {
         this.boxjs.ui.open({
-            name: 'swan-datePickerView',
+            name: 'swan-datePicker',
             data: {
                 start: this.start,
                 end: this.end,

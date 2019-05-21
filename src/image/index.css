@@ -11,3 +11,6 @@ swan-image > div {
     width: 100%;
     height: 100%;
 }
+swan-image.swan-image-will-change {
+    will-change: transform;
+}

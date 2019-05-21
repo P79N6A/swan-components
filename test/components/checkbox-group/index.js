@@ -91,6 +91,13 @@ describe('component [' + COMPONENT_NAME + ']', () => {
                 expect(checkbox.data.get('checked')).toBe(false);
                 done();
             });
+
+            it('should reRegisterFormItem while name changed', done => {
+                const spy = sinon.spy(component, 'reRegisterFormItem');
+                component.data.set('name', 'anotherName');
+                expect(spy.callCount).toBe(1);
+                done();
+            });
         });
     });
 });

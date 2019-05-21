@@ -21,7 +21,7 @@ function preLoadImg(src) {
         };
         setTimeout(() => {
             imgEntity.src = src;
-        }, 100);
+        }, 200);
     });
 }
 
@@ -76,7 +76,6 @@ const getTestCase = ({
         });
     });
 };
-
 describe('component [' + COMPONENT_NAME + ']', () => {
     it('should be render while attach', done => {
         getTestCase({
@@ -197,11 +196,87 @@ describe('component [' + COMPONENT_NAME + ']', () => {
                 preLoadImg(URL_SMARTAPP_LOGO).then(() => {
                     coverimage.nextTick(() => {
                         expect(spy.callCount).toBe(1);
-                        done();
                         testComponent.dispose();
+                        done();
                     });
                 });
             });
         });
     });
 });
+describe('coverImage Fail: insertFail', () => {
+    const component = buildComponent(
+        COMPONENT_NAME,
+        CoverImage,
+        {
+            data: {
+                unitTestParams: {
+                    apiExecResult: 'insertFail'
+                }
+            }
+        }
+    );
+    attach2Document(component);
+    const spy = sinon.spy(component.boxjs.cover, 'insert');
+    it('should catch', done => {
+        setTimeout(() => {
+            expect(component.isInserted).toBe(false);
+            spy.restore();
+            component.dispose();
+            done();
+        }, 500);
+    });
+});
+describe('coverImage Fail: updateFail', () => {
+    const component = buildComponent(
+        COMPONENT_NAME,
+        CoverImage,
+        {
+            data: {
+                unitTestParams: {
+                     apiExecResult: 'updateFail'
+                }
+            }
+        }
+    );
+    attach2Document(component);
+    const spy = sinon.spy(component.boxjs.cover, 'update');
+    it('should catch', done => {
+        setTimeout(() => {
+            component.communicator.fireMessage({
+                type: 'slaveUpdated'
+            });
+            expect(component.isInserted).toBe(true);
+            expect(spy.calledOnceWith(sinon.match.has('type', sinon.match('update')))).toBe(false);
+            spy.restore();
+            component.dispose();
+            done();
+        }, 500);
+    });
+});
+describe('coverImage Fail: removeFail', () => {
+    const component = buildComponent(
+        COMPONENT_NAME,
+        CoverImage,
+        {
+            data: {
+                unitTestParams: {
+                    apiExecResult: 'removeFail'
+                }
+            }
+        }
+    );
+    attach2Document(component);
+    const spy = sinon.spy(component.boxjs.cover, 'remove');
+    it('should catch', done => {
+        setTimeout(() => {
+            expect(spy.calledOnceWith(sinon.match.has('type', sinon.match('remove')))).toBe(false);
+            expect(component.isInserted).toBe(true);
+            spy.restore();
+            component.dispose();
+            done();
+        }, 500);
+    });
+});
+
+

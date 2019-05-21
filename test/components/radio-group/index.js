@@ -90,6 +90,14 @@ describe(`component [${COMPONENT_NAME}]`, () => {
         });
 
         describe('"radio:added" message', () => {
+
+            it('should reRegisterFormItem while name changed', done => {
+                const spy = sinon.spy(component, 'reRegisterFormItem');
+                component.data.set('name', 'anotherName');
+                expect(spy.callCount).toBe(1);
+                done();
+            });
+
             it('should add radioGroup to radio', () => {
                 component.messages['radio:added'].call(component, {
                     target: radio

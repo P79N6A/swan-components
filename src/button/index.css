@@ -78,16 +78,17 @@ swan-button[type="warn"] {
 swan-button[size="default"]:after {
     border-radius: 12px;
 }
-
+/* radius ios*/
+swan-button.swan-button-radius-ios {
+    border-radius: 5px;
+}
+swan-button.swan-button-radius-ios:after {
+    border-radius: 15px;
+}
 swan-button[size="mini"] {
     display: inline-block;
     line-height: 1.9231;
     font-size: 13px;
-    border-radius: 3px;
-}
-
-swan-button[size="mini"]:after {
-    border-radius: 9px;
 }
 
 /* plain */

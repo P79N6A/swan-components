@@ -3,9 +3,11 @@
  *                          切换底层时候，切换enviroment即可)
  * @author houyu(houyu01@baidu.com)
  */
-import EventsEmitter from './events-emitter';
+import EventsEmitter from '@baidu/events-emitter';
 
 const global = window;
+
+let preScrollTopVal = -1; // 保存上一次的scrollTop值
 
 const getWindowHeight = () => {
     return 'CSS1Compat' === document.compatMode ? document.documentElement.clientHeight : document.body.clientHeight;
@@ -29,13 +31,16 @@ export default class EnviromentEvent {
             type: 'scroll',
             called: false,
             handler() {
-                global.addEventListener('scroll', event => {
-                    this.communicator.fireMessage({
-                        type: 'scroll',
-                        event: {
-                            scrollTop: global.scrollY
-                        }
-                    });
+                global.addEventListener('scroll', () => {
+                    if (preScrollTopVal !== global.scrollY) {
+                        this.communicator.fireMessage({
+                            type: 'scroll',
+                            event: {
+                                scrollTop: global.scrollY
+                            }
+                        });
+                        preScrollTopVal = global.scrollY;
+                    }
                 });
             }
         },

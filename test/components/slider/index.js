@@ -3,8 +3,11 @@
  * @author yanghuabei@baidu.com
  */
 
+import sinon from 'sinon';
 import Slider from '../../../src/slider';
 import View from '../../../src/view/index';
+import Form from '../../../src/form/index';
+import Button from '../../../src/button/index';
 import buildComponent from '../../mock/swan-core/build-component';
 import {getComponentClass, getFactory} from '../../mock/swan-core/build-component';
 import componentBaseFieldCheck from '../../utils/component-base-field-check';
@@ -101,6 +104,25 @@ describe(`component [${COMPONENT_NAME}]`, () => {
                     done();
                 });
             });
+
+            // 点击而非滑动
+            it('should fire changing while tap other than move on the slide', done => {
+                const data = component.data;
+                const pageX = targetElement.offsetLeft;
+                const pageY = targetElement.offsetTop;
+
+                const wrapperWidth = targetElement.clientWidth;
+                const stepDistance = wrapperWidth / data.get('max');
+                const movePageX = pageX + stepDistance * 2;
+
+
+                createSingleTouchEvent(targetElement, [{x: movePageX, y: pageY}, {x: movePageX, y: pageY}]).then(() => {
+                    expect(data.get('value')).toBe(2);
+                    done();
+                }).catch(() => {
+                    done();
+                });
+            });
         });
 
         describe('check touch events under position: relative; element', () => {
@@ -157,6 +179,36 @@ describe(`component [${COMPONENT_NAME}]`, () => {
         });
 
         describe('verify set props', () => {
+            it('should disabled', done => {
+                const component = buildComponent(
+                    COMPONENT_NAME,
+                    Slider,
+                    {
+                        data: {
+                            disabled: true
+                        }
+                    }
+                );
+                attach2Document(component);
+
+                const targetElement = component.el.querySelector('.swan-slider-tap-area');
+                const data = component.data;
+                const pageX = targetElement.offsetLeft;
+                const pageY = targetElement.offsetTop;
+
+                const wrapperWidth = targetElement.clientWidth;
+                const stepDistance = wrapperWidth / data.get('max');
+                const movePageX = pageX + stepDistance * 2;
+
+
+                createSingleTouchEvent(targetElement, [{x: movePageX, y: pageY}, {x: movePageX, y: pageY}]).then(() => {
+                    expect(data.get('value')).toBe(0);
+                    done();
+                }).catch(() => {
+                    done();
+                });
+            });
+
             it('blockSize width should not be small than 12px', () => {
                 const component = buildComponent(
                     COMPONENT_NAME,
@@ -191,6 +243,74 @@ describe(`component [${COMPONENT_NAME}]`, () => {
                 const expected = '28px';
                 expect(actual).toBe(expected);
                 component.dispose();
+            });
+
+            it('should reRegisterFormItem while name changed', done => {
+                const spy = sinon.spy(component, 'reRegisterFormItem');
+                component.data.set('name', 'anotherName');
+                expect(spy.callCount).toBe(1);
+                done();
+            });
+        });
+
+        describe('form', () => {
+            function getInstance(buttonType) {
+                const componentView = getComponentClass('view', View);
+                const componentSlider = getComponentClass('slider', Slider);
+                const componentForm = getComponentClass('form', Form);
+                const componentButton = getComponentClass('button', Button);
+                const factory = getFactory();
+                const properties = {
+                    classProperties: {
+                        components: {
+                            view: componentView,
+                            slider: componentSlider,
+                            form: componentForm,
+                            button: componentButton
+                        }
+                    }
+                };
+
+                factory.componentDefine(
+                    'swan-slider',
+                    {
+                        template: `
+                        <swan-page>
+                            <form>
+                                <slider name="mySlider" s-ref='slider' value="50"></slider>
+                                <button form-type="${buttonType}" s-ref="button">button</button>
+                            </form>
+                        </swan-page>
+                        `
+                    },
+                    properties
+                );
+                const TestView = factory.getComponents('swan-slider');
+                const testview = new TestView();
+                testview.attach(document.body);
+                return testview;
+            }
+
+            it('should call getFormValue', done => {
+                const testview = getInstance('submit');
+                const sliderComponent = testview.ref('slider');
+                const buttonComponent = testview.ref('button');
+                const spy = sinon.spy(sliderComponent, 'getFormValue');
+                buttonComponent.fire('bindtap');
+                expect(spy.callCount).toBe(1);
+                testview.dispose();
+                done();
+            });
+
+            it('should call resetFormValue', done => {
+                const testview = getInstance('reset');
+                const sliderComponent = testview.ref('slider');
+                const buttonComponent = testview.ref('button');
+                const spy = sinon.spy(sliderComponent, 'resetFormValue');
+                buttonComponent.fire('bindtap');
+                expect(spy.callCount).toBe(1);
+                testview.dispose();
+                done();
             });
         });
     });

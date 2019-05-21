@@ -3,15 +3,14 @@
  * @author houyu(houyu01@baidu.com)
  */
 import {datasetFilter} from '../utils';
+import {getCustomEventMap} from '../utils/event';
 
 const PROPSCHANGE_THROTTLE_TIME = 10;
 
 export default {
-
     constructor() {
         this._startTime = Date.now();
         this._isCustomComponent = true;
-
         this.communicator.onMessage(
             ['initData'],
             params => {
@@ -26,7 +25,7 @@ export default {
                     this.watch(key, value => {
                         clearTimeout(operationTimmer);
                         operationTimmer = setTimeout(() => {
-                            this.propsChange(key, value)
+                            this.propsChange(key, value);
                         }, PROPSCHANGE_THROTTLE_TIME);
                     });
                 }
@@ -41,7 +40,7 @@ export default {
                     .filter(operation => operation.options.nodeId === this.uid);
                 if (currentOperationSet && currentOperationSet.length) {
                     currentOperationSet.forEach(operation => {
-                        for (let path in operation.setObject) {
+                        for (const path in operation.setObject) {
                             this.data.set(path, operation.setObject[path]);
                         }
                     });
@@ -65,24 +64,8 @@ export default {
             className: this.data.get('class') || '',
             data: this.data.raw,
             ownerId: this.owner.uid,
-            parentId: this.parentComponent.uid
-        });
-
-        this.communicator.onMessage('triggerEvents', params => {
-            if (params.nodeId === this.uid) {
-                // 将params.eventData支持格式由obj改成任何值, eventDataObj在此做了老版本(只支持obj)无detail包裹的兼容
-                const eventDataObj = Object.prototype.toString.call(params.eventData) === '[object Object]'
-                ? params.eventData : {};
-                try {
-                    this.fire('bind' + params.eventName, {
-                        ...this.getDispatchEventObj(),
-                        ...eventDataObj,
-                        detail: params.eventData
-                    });
-                } catch (e) {
-                    console.error(e);
-                }
-            }
+            parentId: this.parentComponent.uid,
+            customEventMap: getCustomEventMap(this.listeners)
         });
 
         this.communicator.onMessage('customComponentInnerBehavior', params => {
@@ -148,9 +131,10 @@ export default {
     insertStyle() {
         const styles = document.querySelectorAll('style');
         const decoratedStyle = Array.from(styles).map(style => style.getAttribute('_from'));
-        if (!decoratedStyle.includes(this.componentPath) && this.customComponentCss.trim() !== '') {
+        const attributeValue = this.componentUniqueName || this.componentPath;
+        if (!decoratedStyle.includes(attributeValue) && this.customComponentCss.trim() !== '') {
             const styleTag = document.createElement('style');
-            styleTag.setAttribute('_from', this.componentPath);
+            styleTag.setAttribute('_from', attributeValue);
             styleTag.innerHTML = this.customComponentCss;
             document.head.appendChild(styleTag);
         }

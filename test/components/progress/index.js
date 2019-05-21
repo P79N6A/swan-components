@@ -55,14 +55,14 @@ describe(`component [${COMPONENT_NAME}]`, () => {
         });
 
         describe('percent change', () => {
-            const component = buildComponent(COMPONENT_NAME, Progess);
-            attach2Document(component);
-            it('should call activeAnimation and percentChange when percent change and active is true', done => {
-                component.nextTick(() => {
+            describe('percent change max', () => {
+                let component = buildComponent(COMPONENT_NAME, Progess);
+                attach2Document(component);
+                it('should call activeAnimation and percentChange when percent change and active is true', done => {
                     const percentChangeSpy = sinon.spy(component, 'percentChange');
                     const activeAnimationSpy = sinon.spy(component, 'activeAnimation');
                     component.data.set('active', true);
-                    component.data.set('percent', 50);
+                    component.data.set('percent', 101);
                     component.nextTick(() => {
                         expect(percentChangeSpy.calledOnce);
                         expect(activeAnimationSpy.calledOnce);
@@ -71,7 +71,26 @@ describe(`component [${COMPONENT_NAME}]`, () => {
                         component.dispose();
                         done();
                     });
-                })
+                });
+            });
+
+            describe('percent change min', () => {
+                let component = buildComponent(COMPONENT_NAME, Progess);
+                attach2Document(component);
+                it('should call activeAnimation and percentChange when percent change and active is true', done => {
+                    const percentChangeSpy = sinon.spy(component, 'percentChange');
+                    const activeAnimationSpy = sinon.spy(component, 'activeAnimation');
+                    component.data.set('active', true);
+                    component.data.set('percent', -1);
+                    component.nextTick(() => {
+                        expect(percentChangeSpy.calledOnce);
+                        expect(activeAnimationSpy.calledOnce);
+                        percentChangeSpy.restore();
+                        activeAnimationSpy.restore();
+                        component.dispose();
+                        done();
+                    });
+                });
             });
         });
     });

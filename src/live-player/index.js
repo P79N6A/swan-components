@@ -9,6 +9,7 @@ import style from './index.css';
 import {getElementBox} from '../utils/dom';
 import {isEqualObject, privateKey, COMPONENT_STATE} from '../utils';
 import {internalDataComputedCreator, typesCast} from '../computedCreator';
+import {STABILITY_LOG_CONFIG} from '../utils/constant';
 
 let PLAYER_WIDTH = screen.height;
 let PLAYER_HEIGHT = screen.width;
@@ -90,7 +91,7 @@ export default {
             {name: 'autoplay', caster: typesCast.boolCast},
             {name: 'muted', caster: typesCast.boolCast},
             {name: 'orientation', data: ['vertical', 'horizontal']},
-            {name: 'objectFit', data: ['vertical', 'fillCrop']},
+            {name: 'objectFit', data: ['contain', 'fillCrop']},
             {name: 'backgroundMute', caster: typesCast.boolCast},
             {name: 'minCache', caster: typesCast.numCast, default: 1},
             {name: 'maxCache', caster: typesCast.numCast, default: 3}
@@ -112,7 +113,7 @@ export default {
      */
     attached() {
         // 接收客户端派发到slave的事件
-        this.communicator.onMessage(`live_${this.data.get('id')}`, event => {
+        this.communicator.onMessage(`live_${this.id}`, event => {
             this.dispatchNaEvent(event.params.action, event.params.e);
         });
     },
@@ -154,7 +155,6 @@ export default {
      */
     getPlayerData() {
         const {
-            id,
             src,
             __muted,
             __orientation,
@@ -169,8 +169,8 @@ export default {
             gesture: this.hasGestrue(),
             hide: __hidden,
             slaveId: this.slaveId,
-            liveId: id,
-            viewId: id,
+            liveId: this.id,
+            viewId: this.id,
             parentId: this.getFirstParentComponentId(this),
             src,
             position: getElementBox(this.el),
@@ -193,14 +193,15 @@ export default {
         }
 
         this.boxjs.media.live({
-            type: 'open',
+            type: 'insert',
             data: this.args
         }).then(() => {
             // 标记贴片已经创建
             this.isInserted = true;
-            this.sendStateChangeMessage('live', COMPONENT_STATE.INSERT, this.args.liveId);
+            this.sendStateChangeMessage('live', COMPONENT_STATE.INSERT, this.data.get('id'), this.args.liveId);
         }).catch(err => {
             console.warn('live player open fail', err);
+            this.logStability(STABILITY_LOG_CONFIG.livePlayerOpenError);
         });
     },
 
@@ -216,7 +217,7 @@ export default {
                 viewId: this.args.viewId
             }
         }).then(res => {
-            this.sendStateChangeMessage('live', COMPONENT_STATE.REMOVE, this.args.liveId);
+            this.sendStateChangeMessage('live', COMPONENT_STATE.REMOVE, this.data.get('id'), this.args.liveId);
         });
     },
 
@@ -289,6 +290,9 @@ export default {
         };
         if (eventName === 'bindfullscreenchange') {
             this.fullScreenChangeHandler(data);
+        }
+        else if (eventName === 'binderror') {
+            this.logStability(STABILITY_LOG_CONFIG.livePlayerBindError);
         }
 
         this.dispatchEvent(eventName, {

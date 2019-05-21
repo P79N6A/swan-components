@@ -83,6 +83,24 @@ export default {
         this.cacheScale = this.data.get(`${privateKey}.scaleValue`);
         this.receiveAreaMessageToScale();
         this.watchParams();
+
+        this.communicator.onMessage('fullscreenchange', message => {
+            let data = message && message.data;
+            // 对于 ios 同层渲染，全屏时候需要禁用掉手势监听
+            this.isVideoFullscreen = data
+                && data.isVideoFullscreenChange
+                && data.isFullscreen;
+        });
+    },
+
+    /**
+     * 是否可以移动视图
+     *
+     * @private
+     * @return {boolean}
+     */
+    canMove() {
+        return !this.isVideoFullscreen && !this.data.get('__disabled');
     },
 
     /**
@@ -90,14 +108,15 @@ export default {
      * @param {Object} [e] 鼠标event对象
      */
     onMovableViewTouchStart(e) {
-        this.preventEvents(e);
-        if (this.data.get('__disabled')) {
+        if (!this.canMove()) {
             return;
         }
+
+        this.moving = false;
         this.stopMove();
         this.data.set(`${privateKey}.transitionDuration`, 0);
-        // ios在多指操作时，多指同时触发touchstart或touchend时，只会触发一个touch的事件。借event里changedTouches的长度来判断到底操作了几个手指
-        this.fingerTouchNum = this.fingerTouchNum + e.changedTouches.length;
+        // 修改目标为targetTouches
+        this.fingerTouchNum = e.targetTouches.length;
         if (1 === this.fingerTouchNum) {
             this.cacheLastInfoforInitDistance(e);
             this.computedStartPositionInView(e);
@@ -106,6 +125,15 @@ export default {
             this.cacheScale = this.data.get(`${privateKey}.scaleValue`);
             this.computedScaleInitDistance(e);
         }
+        // android 下拉刷新冲突
+        this.swaninterface.boxjs.platform.isAndroid() && this.boxjs.ui.open({
+            name: 'swan-preventPullDownRefresh',
+            data: {
+                prevent: true,
+                slaveId: `${this.slaveId}`
+            }
+        });
+
     },
 
     /**
@@ -113,15 +141,27 @@ export default {
      * @param {Object} [e] 鼠标event对象
      */
     onMovableViewTouchMove(e) {
-        this.preventEvents(e);
-        if (this.data.get('__disabled')) {
+        // 无默认事件直接return
+        if (!e.cancelable || !this.canMove()) {
+            return;
+        }
+
+        // 系统下拉加载态时 捕获move中target的最上层的 DOM 元素
+        let touchenterTarget = document.elementFromPoint(e.touches[0].clientX, e.touches[0].clientY);
+        if (e.target !== touchenterTarget) {
             return;
         }
         this.data.set(`${privateKey}.changeStatus`, 'transform');
         if (1 === this.fingerTouchNum && !this.isLastDoubleScale) {
             this.translate(e);
+
+            // 如果不是移动，不禁用默认事件
+            if (this.moving) {
+                this.preventEvents(e);
+            }
         }
         else if (2 === this.fingerTouchNum) {
+            this.preventEvents(e);
             this.scale(e);
         }
     },
@@ -131,18 +171,26 @@ export default {
      * @param {Object} [e] 鼠标event对象
      */
     onMovableViewTouchEnd(e) {
-        this.preventEvents(e);
-        if (this.data.get('__disabled')) {
+        if (!this.moving || !this.canMove()) {
             return;
         }
+
+        this.preventEvents(e);
+
         this.data.set(`${privateKey}.changeStatus`, 'auto');
         this.triggerInertiaOrRebound(e);
         // 计算上一次是否为双指缩放，在缩放后放开一只手指和在ios上同时放开后还是走位移逻辑
         this.fingerTouchNum >= 2 && 1 === e.changedTouches.length ? this.isLastDoubleScale = true : this.isLastDoubleScale = false;
-        this.fingerTouchNum = this.fingerTouchNum - e.changedTouches.length;
         // 手指离开时，将 x、y 属性重置
         this.data.set('x', NaN);
         this.data.set('y', NaN);
+        this.swaninterface.boxjs.platform.isAndroid() && this.boxjs.ui.open({
+            name: 'swan-preventPullDownRefresh',
+            data: {
+                prevent: false,
+                slaveId: `${this.slaveId}`
+            }
+        });
     },
 
     ...computedMethod,
@@ -273,7 +321,7 @@ export default {
      */
     preventEvents(e) {
         e.stopPropagation();
-        e.preventDefault();
+        e.cancelable && e.preventDefault();
     },
 
     /**
@@ -294,7 +342,7 @@ export default {
         this.areaPosition = getElementBox(this.el.parentElement);
         const {top, left} = this.areaPosition;
         const {x, y} = this.data.get(privateKey);
-        this.moveStartPositionInView = {x: pageX - left - x, y: pageY - top - y};
+        this.moveStartPositionInView = {x: pageX - left - x, y: pageY - top - y, pageX, pageY};
     },
 
     /**
@@ -376,7 +424,12 @@ export default {
     translate(e) {
         const {pageX, pageY} = e.changedTouches[0];
         const {top, left} = this.areaPosition;
-        const {x, y} = this.moveStartPositionInView;
+        const {x, y, pageX: startPageX, pageY: startPageY} = this.moveStartPositionInView;
+        // 如果偏移量超过指定阈值，则认为是在移动操作，用于区分可能用户在点击移动区域某些交互元素
+        if (Math.abs(startPageX - pageX) > 2 || Math.abs(startPageY - pageY) > 2) {
+            this.moving = true;
+        }
+
         this.viewActivateType = 1;
         const direction = this.data.get('direction');
         if (direction !== 'none') {
@@ -398,6 +451,9 @@ export default {
      * @param {Object} [e] 鼠标event对象
      */
     scale(e) {
+        if (e.targetTouches.length < 2) {
+            return;
+        }
         this.viewActivateType = 2;
         let currentDistance = computeDistance({x: e.targetTouches[0].pageX, y: e.targetTouches[0].pageY},
             {x: e.targetTouches[1].pageX, y: e.targetTouches[1].pageY});

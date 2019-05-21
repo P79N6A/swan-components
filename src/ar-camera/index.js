@@ -16,6 +16,8 @@ export default {
     template: `<swan-ar-camera style="{{hiddenStyle}}"
         ar-key="{{arKey}}"
         ar-type="{{arType}}"
+        key="{{key}}"
+        type="{{type}}"
         flash="{{flash}}"
         data-sanid="{{provideData.componentId}}"
     >
@@ -49,6 +51,8 @@ export default {
         return {
             arKey: '',
             arType: '',
+            key: '', // 官网文档对外接口为key和type，之前为arKey和arType依旧兼容保留
+            type: '',
             flash: 'off',
             [privateKey]: {
                 componentId: this.id
@@ -113,7 +117,7 @@ export default {
      */
     updateARCamera() {
         let boxdata = this.getBoxJsData();
-        this.boxjs.media.arCamera({
+        this.boxjs.media.ARCamera({
             type: 'update',
             data: boxdata
         }).catch(e => {
@@ -174,8 +178,8 @@ export default {
             ARCameraId: this.ARCameraId,
             viewId: this.ARCameraId,
             parentId: this.getFirstParentComponentId(this),
-            ARKey: this.data.get('arKey'),
-            ARType: this.data.get('arType'),
+            ARKey: this.data.get('key') || this.data.get('arKey'),
+            ARType: this.data.get('type') || this.data.get('arType'),
             flash: this.data.get('__flash'),
             position: getElementBox(this.el)
         };
@@ -190,11 +194,11 @@ export default {
             return;
         }
         // todo invoke boxjs
-        this.boxjs.media.arCamera({
+        this.boxjs.media.ARCamera({
             type: 'insert',
             data: data
         }).then(res => {
-            this.sendStateChangeMessage('ARCamera', COMPONENT_STATE.INSERT);
+            this.sendStateChangeMessage('ARCamera', COMPONENT_STATE.INSERT, '', this.id);
         }).catch(e => {
             this.dispatchErrorEvent(e.errCode, e.errMsg);
         });
@@ -204,7 +208,7 @@ export default {
      * detached时把NA组件remove掉
      */
     removeARCamera() {
-        this.boxjs.media.arCamera({
+        this.boxjs.media.ARCamera({
             type: 'remove',
             data: {
                 slaveId: this.slaveId,
@@ -214,7 +218,7 @@ export default {
             }
         }).then(res => {
             onlyCameraFlag = false;
-            this.sendStateChangeMessage('ARCamera', COMPONENT_STATE.REMOVE);
+            this.sendStateChangeMessage('ARCamera', COMPONENT_STATE.REMOVE, '', this.id);
         }).catch(e => {
             this.dispatchErrorEvent(e.errCode, e.errMsg);
         });

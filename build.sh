@@ -1,6 +1,7 @@
 #!/bin/sh
 
-npm install
+npm install --registry http://registry.npm.baidu-int.com @baidu/events-emitter@^1.0.15
+npm install --registry http://registry.npm.baidu-int.com
 npm run build
 
 rm -fr output

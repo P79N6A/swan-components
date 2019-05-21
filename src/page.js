@@ -9,6 +9,8 @@ import {accumulateDiff} from './utils/data-diff';
 import swanEvents from './utils/swan-events';
 import {addIntersectionObserver, removeIntersectionObserver} from './utils/dom/swanXml/intersection-listener';
 import {computeObserverIntersection} from './utils/dom/swanXml/intersection-calculator';
+import {getCustomEventMap} from './utils/event';
+
 export default {
 
     dependencies: ['swaninterface', 'communicator'],
@@ -73,11 +75,11 @@ export default {
         }
     },
     getFPTiming(timeGap) {
-        let paintMetrics = performance.getEntriesByType('paint');
+        const paintMetrics = performance.getEntriesByType('paint');
         if (paintMetrics !== undefined && paintMetrics.length > 0) {
-            let fcp = paintMetrics.filter(entry => entry.name === 'first-contentful-paint');
+            const fcp = paintMetrics.filter(entry => entry.name === 'first-contentful-paint');
             if (fcp.length >= 1) {
-                let fpTimeStamp = parseInt(timeGap + fcp[0].startTime, 10);
+                const fpTimeStamp = parseInt(timeGap + fcp[0].startTime, 10);
                 this.andrSendFP(fpTimeStamp, 'paint_entry_get');
             } else {
                 this.andrSendFP(-1, 'get_performance_paint_entry_empty');
@@ -96,12 +98,12 @@ export default {
 
             if ('performance' in global) {
                 // 如果能获取到timeOrigin，则使用timeOrigin，否则使用Date.now 和performance.now 之间的差值
-                let timeGap = global.performance.timeOrigin || Date.now() - global.performance.now();
+                const timeGap = global.performance.timeOrigin || Date.now() - global.performance.now();
 
                 if ('PerformanceObserver' in global) {
                     // 如果有PerformanceObserver对象，则使用PerformanceOvbserver来监听
-                    let observerPromise = new Promise((resolve, reject) => {
-                        let observer = new global.PerformanceObserver(list => {
+                    const observerPromise = new Promise((resolve, reject) => {
+                        const observer = new global.PerformanceObserver(list => {
                             resolve(list);
                         });
                         observer.observe({
@@ -109,10 +111,10 @@ export default {
                         });
                     }).then(list => {
                         // 获取和首屏渲染相关的所有点，first-contentful-paint
-                        let fcp = list.getEntries().filter(entry => entry.name === 'first-contentful-paint');
+                        const fcp = list.getEntries().filter(entry => entry.name === 'first-contentful-paint');
                         if (fcp.length >= 1) {
                             // 如果有first-paint点，取first-contentful-paint
-                            let fpTimeStamp = parseInt(timeGap + fcp[0].startTime, 10);
+                            const fpTimeStamp = parseInt(timeGap + fcp[0].startTime, 10);
                             this.andrSendFP(fpTimeStamp, 'observer_get_fp');
                         } else {
                             // 如果从Observer取不到任何有意义的first render点，从performance.getEntries('paint')获取前端渲染点
@@ -133,19 +135,18 @@ export default {
                 this.andrSendFP(-1, 'fe_no_performance_api');
             }
         }
-
         this.slavePageRendered();
         this.sendAbilityMessage('rendered', this.masterNoticeComponents);
         this.sendAbilityMessage('nextTickReach');
+        this.sendAbilityMessage('customEventsMap', {
+            eventType: 'customEventsMap',
+            eventParams: {
+                customEventMap: getCustomEventMap(this.listeners)
+            }
+        });
     },
 
     messages: {
-        'video:syncCurrentTime'({value: {target, id}}) {
-            this.videoMap = this.videoMap || {};
-            this.videoMap[id] = target;
-            this.sendAbilityMessage('videoSyncMap', id);
-        },
-
         abilityMessage({value: {eventType, eventParams}}) {
             this.sendAbilityMessage(eventType, eventParams);
         },
@@ -159,7 +160,7 @@ export default {
         }
     },
 
-	/**
+    /**
 	 * 发送abilityMessage
 	 *
 	 * @private
@@ -211,7 +212,7 @@ export default {
         );
     },
 
-	/**
+    /**
 	 * slave加载完通知master开始加载slave的js
 	 *
 	 * @private
@@ -229,7 +230,7 @@ export default {
         );
     },
 
-	/**
+    /**
 	 * slave加载完通知master开始加载slave的js
 	 *
 	 * @private
@@ -250,8 +251,8 @@ export default {
         // 如果fireMessage比onMessage先，在onMessage时会把消息队列里的整个数组丢过来
         // 现在首屏，会执行两次initData的fireMessage，顺序为fire => on => fire
         params = Object.prototype.toString.call(params) === '[object Array]' ? params[0] : params;
-        let {value, appConfig} = params;
-        for (let k in value) {
+        const {value, appConfig} = params;
+        for (const k in value) {
             this.data.set(k, value[k]);
         }
         if (!this.enviromentBinded) {
@@ -271,10 +272,10 @@ export default {
                 const setObject = params.setObject || {};
                 const operationType = params.type.replace('Data', '');
                 if (operationType === 'set') {
-                    let setDataDiff = accumulateDiff(this.data.get(), setObject);
+                    const setDataDiff = accumulateDiff(this.data.get(), setObject);
                     setDataDiff && setDataDiff.reverse().forEach(ele => {
                         const {kind, rhs, path, item, index} = ele;
-                        let dataPath = path.reduce((prev, cur) => `${prev}['${cur}']`);
+                        const dataPath = path.reduce((prev, cur) => `${prev}['${cur}']`);
                         // 将用户setData操作数组的时候，分解成san推荐的数组操作，上面reverse也是为了对数组进行增删改的时候顺序不乱
                         if (kind === 'A') {
                             if (item.kind === 'N') {
@@ -290,7 +291,7 @@ export default {
                     });
                 }
                 else {
-                    for (let path in setObject) {
+                    for (const path in setObject) {
                         this.data[operationType](path, setObject[path]);
                     }
                 }
@@ -353,12 +354,12 @@ export default {
      * @return {undefined}
      */
     onRequestComponentObserver() {
-        let self = this;
-        let observerMap = {};
+        const self = this;
+        const observerMap = {};
 
         window.addEventListener('scroll', () => {
             requestAnimationFrame(function () {
-                for (let observerId in observerMap) {
+                for (const observerId in observerMap) {
                     computeObserverIntersection(observerMap[observerId]);
                 }
             });
@@ -406,7 +407,7 @@ export default {
         || (systemInfo.model === 'iPhone Simulator <x86-64>'
         && systemInfo.screenHeight === 812
         && systemInfo.screenWidth === 375)) {
-            const platform = this.swaninterface.boxjs.platform
+            const platform = this.swaninterface.boxjs.platform;
             if (platform.isBox() && platform.boxVersion()
             && platform.versionCompare(platform.boxVersion(), '10.13.0') < 0) {
                 return;

@@ -29,7 +29,8 @@ describe('component [' + COMPONENT_NAME + ']', () => {
     });
 
     it('should handle from submit', () => {
-        component.data.set('value', 'test')
+        component.data.set('value', 'test');
+        component.data.set('name', 'test');
         expect(component.getFormValue()).toBe('test');
     });
 
@@ -60,6 +61,12 @@ describe('component [' + COMPONENT_NAME + ']', () => {
             done();
         });
         component3.nextTick(() => {
+            window[component3.callbackName](JSON.stringify({
+                data: encodeURIComponent(JSON.stringify({
+                    value: 'test',
+                    eventName: 'placeholder'
+                }))
+            }));
             component3.nextTick(() => {
                 window[component3.callbackName](JSON.stringify({
                     data: encodeURIComponent(JSON.stringify({
@@ -68,6 +75,28 @@ describe('component [' + COMPONENT_NAME + ']', () => {
                         eventName: 'change'
                     }))
                 }));
+            });
+        });
+    });
+    const component31 = buildComponent(COMPONENT_NAME, inputComponent);
+    attach2Document(component31);
+    component31.data.set('focus', true);
+    it('should trigger bindfocus while focus', done => {
+
+        component31.on('bindfocus', e => {
+            expect(e.detail.value).toBe('test');
+            component31.dispose();
+            done();
+        });
+        component31.nextTick(() => {
+            component31.nextTick(() => {
+                window[component31.callbackName](JSON.stringify({
+                    data: encodeURIComponent(JSON.stringify({
+                        value: 'test',
+                        eventName: 'focus'
+                    }))
+                }));
+
             });
         });
     });
@@ -88,7 +117,7 @@ describe('component [' + COMPONENT_NAME + ']', () => {
                         cursorOffset: 1,
                         eventName: 'confirm'
                     }))
-                })); 
+                }));
             })
         });
     });
@@ -109,7 +138,7 @@ describe('component [' + COMPONENT_NAME + ']', () => {
                         cursorOffset: 1,
                         eventName: 'blur'
                     }))
-                })); 
+                }));
             })
         });
     });
@@ -175,7 +204,12 @@ describe('component [' + COMPONENT_NAME + ']', () => {
     });
 
     describe('props watch', () => {
-        const component = buildComponent(COMPONENT_NAME, inputComponent);
+        const component = buildComponent(COMPONENT_NAME, inputComponent, {
+            data:{
+                selectionStart: false,
+                selectionEnd: true
+            }
+        });
         attach2Document(component);
 
         it('should call closeNativeInput/showNativeInput while focus changed', done => {
@@ -190,11 +224,33 @@ describe('component [' + COMPONENT_NAME + ']', () => {
                 done();
             });
         });
+        it(' placeholderStyle should be watche', done => {
+            const stub = sinon.stub(component, 'placeholderStyleChange');
+
+            component.data.set('placeholderStyle', {
+                'font-size': '16px',
+                'font-weight': 'normal',
+                'color': '#fff',
+                'text-align': 'left'
+            });
+            component.data.set('placeholderClass','test');
+            component.nextTick(() => {
+                expect(stub.callCount).not.toBe(true);
+                stub.restore();
+                done();
+            });
+        });
+
     });
 
     describe('props type', () => {
         const attrArr = ['focus', 'hidden', 'password', 'disabled', 'focus', 'confirmHold', 'adjustPosition'];
-        const component = buildComponent(COMPONENT_NAME, inputComponent);
+        const component = buildComponent(COMPONENT_NAME, inputComponent,{
+            data:{
+                selectionStart: 'ewewew',
+                selectionEnd:{}
+            }
+        });
         attach2Document(component);
         attrArr.forEach(name => {
             it(`__${name} should be boolean`, () => {

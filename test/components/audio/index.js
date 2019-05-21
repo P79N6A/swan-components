@@ -2,6 +2,7 @@
  * @file audio 组件单测
  * @author  zhuwenxuan@baidu.com
  *          mabin03@baidu.com
+ *          yangzongjun@baidu.com
  */
 
 import sinon from 'sinon';
@@ -9,6 +10,7 @@ import audio from '../../../src/audio/index';
 import buildComponent from '../../mock/swan-core/build-component';
 import componentBaseFieldCheck from '../../utils/component-base-field-check';
 import attach2Document from '../../utils/attach-to-document';
+import {privateKey} from '../../../src/utils';
 const COMPONENT_NAME = 'audio';
 
 describe('component [' + COMPONENT_NAME + '] without init data', () => {
@@ -89,18 +91,35 @@ describe('component [' + COMPONENT_NAME + '] with init data', () => {
         poster: 'http://c.hiphotos.baidu.com/super/pic/item/8b13632762d0f703e34c0f6304fa513d2797c597.jpg',
         name: '演员',
         author: '薛之谦',
-        src: 'http://vd3.bdstatic.com/mda-ic7mxzt5cvz6f4y5/mda-ic7mxzt5cvz6f4y5.mp3',
+        src: 'https://interactive-examples.mdn.mozilla.net/media/examples/t-rex-roar.mp3',
         controls: true,
         loop: true
     };
     const component = buildComponent(COMPONENT_NAME, audio, {
         data
     });
-    attach2Document(component);
-    it('should be removed after detached', done => {
+    let $component = attach2Document(component);
+
+    it('should pause while click twice', done => {
         component.nextTick(() => {
+            // change src
+            component.data.set('src', 'http://asdf.mp3');
+            component.audio.onload();
+            component.audio.onplay();
+            component.audio.ontimeupdate();
+            component.audio.onpause();
+            component.audio.onended();
+            component.audio.onerror({srcElement: {error: {code: 'MEDIA_ERR_ABORTED'}}});
+            component.audio.onerror({srcElement: {error: {code: 'MEDIA_ERR_NETWORK'}}});
+            component.audio.onerror({srcElement: {error: {code: 'MEDIA_ERR_DECODE'}}});
+
+            const spy = sinon.spy(component, 'onClick');
+            component.data.set(`${privateKey}.playState`, 1);
+            let $playBtn = $component.querySelector('img + span');
+            $playBtn.click();
+            expect(spy.callCount).toBe(1);
+
             component.dispose();
-            expect(component.audio).toBe(null);
             done();
         });
     });

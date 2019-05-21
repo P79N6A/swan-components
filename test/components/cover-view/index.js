@@ -1,3 +1,4 @@
+
 /**
  * @file cover-view组件单测
  * @author sunbaixin@baidu.com
@@ -11,7 +12,6 @@ import attach2Document from '../../utils/attach-to-document';
 import Communicator from '../../mock/communicator';
 import {tapEventCallbackFieldCheck} from '../../utils/event-callback-field-check';
 import {getComponentClass, getFactory} from '../../mock/swan-core/build-component';
-
 const COMPONENT_NAME = 'cover-view';
 
 /* eslint-disable max-nested-callbacks */
@@ -55,6 +55,7 @@ describe(`component [${COMPONENT_NAME}]`, () => {
                     spy2.restore();
                     component.isInserted = true;
                     component.detached();
+                    component.slaveUpdated();
                     expect(spy3.called).toBe(true);
                     component.nextTick(() => {
                         expect(component.isInserted).toBe(false);
@@ -140,6 +141,78 @@ describe(`component [${COMPONENT_NAME}]`, () => {
                     }
                 }
             });
+
         });
+    });
+});
+describe('coverView Fail: insertFail', () => {
+    const component = buildComponent(
+        COMPONENT_NAME,
+        CoverView,
+        {
+            data: {
+                unitTestParams: {
+                    apiExecResult: 'insertFail'
+                }
+            }
+
+        }
+    );
+    attach2Document(component);
+    const spy = sinon.spy(component.boxjs.cover, 'insert');
+    it('should catch', done => {
+        setTimeout(() => {
+            expect(component.isInserted).toBe(false);
+            spy.restore();
+            component.dispose();
+            done();
+        }, 500);
+    });
+});
+describe('coverView Fail: updateFail', () => {
+    const component = buildComponent(
+        COMPONENT_NAME,
+        CoverView,
+        {
+            data: {
+                unitTestParams: {
+                    apiExecResult: 'updateFail'
+                }
+            }
+
+        }
+    );
+    attach2Document(component);
+    const spy = sinon.spy(component.boxjs.cover, 'update');
+    it('should catch', done => {
+        setTimeout(() => {
+            expect(component.isInserted).toBe(true);
+            spy.restore();
+            component.dispose();
+            done();
+        }, 500);
+    });
+});
+describe('coverView Fail: removeFail', () => {
+    const component = buildComponent(
+        COMPONENT_NAME,
+        CoverView,
+        {
+            data: {
+                unitTestParams: {
+                    apiExecResult: 'removeFail'
+                }
+            }
+        }
+    );
+    attach2Document(component);
+    const spy = sinon.spy(component.boxjs.cover, 'remove');
+    it('should catch', done => {
+        setTimeout(() => {
+            expect(component.isInserted).toBe(true);
+            spy.restore();
+            component.dispose();
+            done();
+        }, 500);
     });
 });

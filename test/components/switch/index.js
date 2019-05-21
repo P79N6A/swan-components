@@ -56,6 +56,22 @@ describe('component [' + COMPONENT_NAME + ']', () => {
 
         afterEach(() => component.dispose());
 
+        describe('base faeture', () => {
+            it('should disabled', done => {
+                component.data.set('disabled', true);
+                component.el.click();
+                expect(component.data.get('checked')).toBe(false);
+                done();
+            });
+
+            it('should reRegisterFormItem while name changed', done => {
+                const spy = sinon.spy(component, 'reRegisterFormItem');
+                component.data.set('name', 'anotherName');
+                expect(spy.callCount).toBe(1);
+                done();
+            });
+        });
+
         describe('event and message', () => {
             it('should listen LabelTapped/LabelFirstTapped message from communicator', () => {
                 const spy = sinon.spy(component, 'onClick');
@@ -125,6 +141,4 @@ describe('component [' + COMPONENT_NAME + ']', () => {
             });
         });
     });
-
-
 });

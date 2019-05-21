@@ -107,7 +107,7 @@ describe(`base component [${COMPONENT_NAME}]`, () => {
 
         it('should has instance property slaveId', () => {
             const actual = component.slaveId;
-            const expected = boxjsDataGetMock['swan-slaveIdSync'].slaveId;
+            const expected = boxjsDataGetMock['swan-slaveIdSync']['res'].slaveId;
             expect(actual).toBe(expected);
         });
 

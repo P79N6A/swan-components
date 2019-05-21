@@ -285,6 +285,8 @@ export default {
                             cursor
                         }
                     });
+                    // 设置前端focus为false
+                    this.data.set('focus', false);
                     this.setKeyboardStatus(0);
                 },
                 input() {
@@ -652,6 +654,7 @@ export default {
      * @return {string} value 值
      */
     getFormValue() {
+        this.isFocus = false;
         return this.data.get('__value');
     },
 
@@ -660,7 +663,12 @@ export default {
      * @override
      */
     resetFormValue() {
+        this.isFocus = false;
         this.data.set('value', '');
+        // 焦点不存在时，直接更新 NA 视图
+        this.updateTextarea({
+            value: ''
+        });
     },
 
     /**

@@ -89,6 +89,45 @@ const behaviorMap = {
 
     userTouchEvents: {
         methods: {
+            onTapevent(originMethod = noop, $event, capture) {
+                if (!eventExecCondition.call(this, $event)) {
+                    return;
+                }
+                const prefix = capture ? 'capture' : '';
+                let touchRelation = this.touchRelation;
+                if (this.__fingerCount === 1) {
+                    // 键盘弹起时，不校验 touchstart 与 touchend 之间的距离，防止 ios 端的 tap 事件无法触发
+                    if (computeDistance(touchRelation.end, touchRelation.start) < TAP_DISTANCE_THRESHOLD
+                        || !this.__computeDistanceWhenTap) {
+                        this.fire(prefix + 'bindtap', $event);
+                    }
+                }
+
+            },
+
+            onlongTapevent(originMethod = noop, $event, capture) {
+                if (!eventExecCondition.call(this, $event)) {
+                    return;
+                }
+
+                const prefix = capture ? 'capture' : '';
+                let touchRelation = this.touchRelation;
+                const bindEvents = Object.keys(this.listeners);
+                if (touchRelation.start && computeDistance(touchRelation.start, touchRelation.start)
+                    > TAP_DISTANCE_THRESHOLD) {
+                    return false;
+                }
+                if (this.__fingerCount === 1) {
+                    // longpress事件优先级比longtap高，若开发者绑定了longpress和longtap，只会触发longpress
+                    if (bindEvents.includes(prefix + 'bindlongpress')) {
+                        this.fire(prefix + 'bindlongpress', $event);
+                    }
+                    else if (bindEvents.includes(prefix + 'bindlongtap')) {
+                        this.fire(prefix + 'bindlongtap', $event);
+                    }
+                    this.__computeDistanceWhenTap = true;
+                }
+            },
             onTouchEnd(originMethod = noop, $event, capture) {
                 // 组件的 touchend 事件会触发两次
                 this.__touchEndTimes = this.__touchEndTimes ? this.__touchEndTimes : 0;
@@ -104,13 +143,12 @@ const behaviorMap = {
                     y: $event.changedTouches[0].screenY,
                     time: +new Date()
                 };
-                if (this.__touchesLength === 1
+                if (this.__fingerCount === 1
                     && touchRelation.end.time - touchRelation.start.time < LONG_PRESS_TIME_THRESHOLD) {
                         // 键盘弹起时，不校验 touchstart 与 touchend 之间的距离，防止 ios 端的 tap 事件无法触发
                     if (computeDistance(touchRelation.end, touchRelation.start) < TAP_DISTANCE_THRESHOLD
                         || !this.__computeDistanceWhenTap) {
                         'function' === typeof this.onTap && this.onTap($event);
-                        this.fire(prefix + 'bindtap', $event);
                     }
                 }
                 this.fire(prefix + 'bindtouchend', $event);
@@ -136,32 +174,14 @@ const behaviorMap = {
                 }
                 // 键盘弹起时，不校验 touchstart 与 touchend 之间的距离，防止 ios 端的 tap 事件无法触发
                 this.__computeDistanceWhenTap = !KEYBOARD_STATUS;
-                this.__touchesLength = $event.touches.length;
+                // 修改为targetTouches绑定事件的那个结点上的触摸点的集合列表
+                this.__fingerCount = $event.targetTouches.length;
                 const prefix = capture ? 'capture' : '';
                 this.touchRelation.start = {
                     x: $event.changedTouches[0].screenX,
                     y: $event.changedTouches[0].screenY,
                     time: +new Date()
                 };
-                // 备份event参数
-                this.$event = {
-                    currentTarget: $event.currentTarget,
-                    target: $event.target,
-                    changedTouches: $event.changedTouches,
-                    touches: $event.touches,
-                    timeStamp: $event.timeStamp
-                };
-                this[`__${prefix}longpressTimer`] = setTimeout(() => {
-                    const bindEvents = Object.keys(this.listeners);
-                    // longpress事件优先级比longtap高，若开发者绑定了longpress和longtap，只会触发longpress
-                    if (bindEvents.includes(prefix + 'bindlongpress')) {
-                        this.fire(prefix + 'bindlongpress', this.$event);
-                    }
-                    else if (bindEvents.includes(prefix + 'bindlongtap')) {
-                        this.fire(prefix + 'bindlongtap', this.$event);
-                    }
-                    this.__computeDistanceWhenTap = true;
-                }, LONG_PRESS_TIME_THRESHOLD);
                 this.fire(prefix + 'bindtouchstart', $event);
                 return originMethod.call(this, $event, capture);
             },
@@ -178,7 +198,6 @@ const behaviorMap = {
                 };
                 if (computeDistance(touchRelation.move, touchRelation.start) > TAP_DISTANCE_THRESHOLD) {
                     this.__computeDistanceWhenTap = true;
-                    clearTimeout(this[`__${prefix}longpressTimer`]);
                 }
                 this.fire(prefix + 'bindtouchmove', $event);
                 return originMethod.call(this, $event, capture);
@@ -297,6 +316,7 @@ const behaviorMap = {
             },
 
             classDel(originMethod = noop, origin, fragmentName) {
+                fragmentName = fragmentName.trim();
                 return origin.replace(new RegExp(`${fragmentName}`, 'g'), '');
             }
         }
@@ -336,7 +356,14 @@ const behaviorMap = {
                     && !isEqualObject(this.__animationData, animationData)) {
                     this.__animationData = animationData;
                     animationData = null;
-                    animationEffect(this.el, this.__animationData);
+                    animationEffect(this.el, this.__animationData).then(() => {
+                        this.communicator.fireMessage({
+                            type: 'slaveUpdated'
+                        });
+                        this.communicator.fireMessage({
+                            type: 'slaveRendered'
+                        });
+                    });
                 }
                 return originMethod.call(this, ...args);
             }
@@ -487,7 +514,7 @@ const behaviorMap = {
              * @return {Promise} 端能力执行结果
              */
             insertNativeCover(originMethod = noop, {
-                name = 'coverview',
+                name = 'coverView',
                 params = {}
             }) {
                 return new Promise((resolve, reject) => {
@@ -511,7 +538,7 @@ const behaviorMap = {
              * @return {Promise} 端能力执行结果
              */
             updateNativeCover(originMethod = noop, {
-                name = 'coverview',
+                name = 'coverView',
                 params = {}
             }) {
                 return new Promise((resolve, reject) => {
@@ -535,7 +562,7 @@ const behaviorMap = {
              * @return {Promise} 端能力执行结果
              */
             removeNativeCover(originMethod = noop, {
-                name = 'coverview',
+                name = 'coverView',
                 params = {}
             }) {
                 return new Promise((resolve, reject) => {
@@ -611,6 +638,7 @@ const behaviorMap = {
 
                 borderRadius = parseFloat(borderRadius);
                 fontSize = parseFloat(fontSize) || 12;
+                lineHeight = parseFloat(lineHeight) || 1.2 * fontSize;
 
                 let cssStyleWhiteSpace = computedStyle.whiteSpace;
                 if (/%$/.test(computedStyle.borderRadius)) {
@@ -685,7 +713,8 @@ const behaviorMap = {
                     opacity: `${parseFloat(opacity)}`,
                     color: hexColor(color),
                     fontSize: `${fontSize}`,
-                    lineHeight: `${parseFloat(lineHeight) || 1.2 * fontSize}`,
+                    lineHeight, // ios 用此字段表line-height
+                    lineSpace: `${Math.max(0, lineHeight - 1.2 * fontSize)}`, // android 用此字段模拟line-height
                     textAlign,
                     fontWeight,
                     lineBreak,

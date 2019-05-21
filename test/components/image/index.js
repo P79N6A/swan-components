@@ -22,13 +22,11 @@ describe('component [' + COMPONENT_NAME + ']', () => {
     componentBaseFieldCheck(COMPONENT_NAME, component);
     describe('base feature', () => {
         it('should be render while attach', () => {
+            component.data.set('mode', 'top');
             let $swanImage = $component.querySelector('swan-image>div');
             expect($swanImage).not.toBe(null);
-            expect($swanImage.style.backgroundSize.indexOf('100% 100%')).not.toBe(-1);
         });
     });
-
-
     describe('events and message', () => {
         it('should not dispatch bindload since img had loaded while listen componentScroll message from communicator', done => {
             let spy = sinon.spy(component, 'dispatchEvent');
@@ -47,13 +45,13 @@ describe('component [' + COMPONENT_NAME + ']', () => {
                     mode: 'widthFix'
                 }
             });
-            
+
             component.on('bindload', e => {
                 loadEventCallbackFieldCheck(expect, done, e);
             });
             attach2Document(component);
         })
-            
+
         it('should trigger binderror while error', done => {
             const componet2 = buildComponent(COMPONENT_NAME, image, {
                 data: {
@@ -78,9 +76,7 @@ describe('component [' + COMPONENT_NAME + ']', () => {
 
         it('image type: data:image, should dispatch bindload', done => {
             let spy = sinon.spy(component, 'dispatchEvent');
-
             component.data.set('src', 'data:image/xxx');
-
             component.nextTick(() => {
                 expect(spy.calledOnceWith('bindload'));
                 spy.restore();
@@ -90,9 +86,7 @@ describe('component [' + COMPONENT_NAME + ']', () => {
 
         it('image type: data:image, should dispatch bindload', done => {
             let spy = sinon.spy(component, 'dispatchEvent');
-
             component.data.set('src', 'data:image/xxx');
-
             component.nextTick(() => {
                 expect(spy.calledOnceWith('bindload'));
                 spy.restore();
@@ -114,9 +108,7 @@ describe('component [' + COMPONENT_NAME + ']', () => {
 
         it('should not dispatch bindload when src of img is null', done => {
             let spy = sinon.spy(component, 'dispatchEvent');
-
             component.data.set('src', '');
-
             component.nextTick(() => {
                 expect(spy.calledOnceWith('bindload'));
                 spy.restore();
@@ -124,5 +116,25 @@ describe('component [' + COMPONENT_NAME + ']', () => {
             });
         });
     });
-
+    describe('image apiFail: dataFail', () => {
+        let component = buildComponent(COMPONENT_NAME, image, {
+            data: {
+                apiExecResult: 'dataFail',
+                src: 'https://www.baidu.com/favicon.ico',
+                mode: 'widthFix',
+                lazyLoad: true
+            }
+        });
+        attach2Document(component);
+        component.data.set('src', 'bdfile://xxx');
+        component.data.set('mode', 'heightFix');
+        it('should catch', done => {
+            const spy = sinon.spy(component.boxjs.data, 'get');
+            component.nextTick(() => {
+                //expect(spy.calledWith(sinon.match.has('name', sinon.match('swan-localImgData')))).toBe(true);
+                spy.restore();
+                done();
+            });
+        })
+    });
 });

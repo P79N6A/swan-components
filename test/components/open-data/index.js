@@ -4,7 +4,6 @@ import attach2Document from '../../utils/attach-to-document';
 import componentBaseFieldCheck from '../../utils/component-base-field-check';
 import sinon from 'sinon';
 const COMPONENT_NAME = 'OpenData';
-
 describe('component [' + COMPONENT_NAME + ']', () =>{
     const component = buildComponent(COMPONENT_NAME, OpenData);
     const $component = attach2Document(component);
@@ -19,7 +18,46 @@ describe('component [' + COMPONENT_NAME + ']', () =>{
         });
     });
 });
+describe('fail checked', () => {
+    const component7 = buildComponent(COMPONENT_NAME, OpenData, {
+        data: {
+            type: 'userAvatarUrl'
+        }
+    });
+    // 重写 privateGetUserInfo 方法，使端能力中能够注入额外参数，以 mock 出未登录的 case
+    component7.privateGetUserInfo = function () {
+        return new Promise((resolve, reject) => {
+            component7.boxjs.data.get({
+                name: 'swan-baidu.privateGetUserInfo',
+                data: {
+                    unLogined: true,
+                    callback(res) {
+                        const resData = JSON.parse(res);
+                        resData.data = resData.data || {};
+                        resolve(resData);
+                    },
+                    test: 'fail'
+                }
+            }).catch(err => {
+                reject(err);
+            });
+        });
+    };
+    const $component7 = attach2Document(component7);
+    it('getdata fail check ', done => {
+        component7.communicator.fireMessage({
+            type: 'openDataAccountChange'
+        });
+        component7.nextTick(() => {
+            const $avatar = $component7.querySelector('.avatar');
+            expect($avatar).not.toBe(null);
+            expect($avatar.getAttribute('style')).toBe('');
+            done();
+            component7.dispose();
+        });
+    });
 
+});
 describe('component [' + COMPONENT_NAME + ']', () =>{
     const component1 = buildComponent(COMPONENT_NAME, OpenData, {
         data: {
@@ -72,7 +110,7 @@ describe('component [' + COMPONENT_NAME + ']', () =>{
     component4.privateGetUserInfo = function () {
         return new Promise((resolve, reject) => {
             component4.boxjs.data.get({
-                name: 'swan-privateGetUserInfo',
+                name: 'swan-baidu.privateGetUserInfo',
                 data: {
                     unLogined: true,
                     callback(res) {

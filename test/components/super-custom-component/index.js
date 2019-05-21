@@ -10,17 +10,20 @@ describe('component [' + COMPONENT_NAME + ']', () => {
     const viewComponent = buildComponent('swan-view', view);
     const $viewComponent = attach2Document(viewComponent);
     const factory = getFactory();
-    factory.componentDefine('custom-component', Object.assign({}, superCustomComponent, {
-        template: '<swan-cus-comp><view>aaa</view></swan-cus-comp>',
-        componentPath: 'super-custom-component-test',
-        componentName: 'super-custom-component-test',
-        customComponentCss: '',
-    }),
-    {
-        classProperties: {
-            components: Object.assign({}, factory.getAllComponents())
+    factory.componentDefine(
+        'custom-component',
+        Object.assign({}, superCustomComponent, {
+            template: '<swan-cus-comp><view>aaa</view></swan-cus-comp>',
+            componentPath: 'super-custom-component-test',
+            componentName: 'super-custom-component-test',
+            customComponentCss: ''
+        }),
+        {
+            classProperties: {
+                components: Object.assign({}, factory.getAllComponents())
+            }
         }
-    });
+    );
     const CustomComponent = factory.getComponents('custom-component');
 
     factory.componentDefine('test', {
@@ -28,15 +31,16 @@ describe('component [' + COMPONENT_NAME + ']', () => {
     }, {
         classProperties: {
             components: {
-                'swan-cus-comp' : CustomComponent
+                'swan-cus-comp': CustomComponent
             }
         }
-    })
+    });
     const TestView = factory.getComponents('test');
     const testView = new TestView();
     attach2Document(testView);
     const cus = testView.ref('cus');
     const cusUid = cus.uid;
+
     it('should handle initData message', () => {
         cus.communicator.fireMessage({
             type: 'initData',
@@ -48,11 +52,21 @@ describe('component [' + COMPONENT_NAME + ']', () => {
                 }
             }
         });
-        
+
+        cus.getDispatchEventObj();
+        cus.getFormValue();
+        cus.owner = {_update: () => {}, eventHappen: () => {}};
+        cus.eventHappen();
+
+        const stub = sinon.stub(cus, 'customComponentCss').value('customComponentCss');
+        cus.insertStyle();
+        stub.restore();
+
         expect(cus.data.get('a')).toBe(0);
         cus.data.set('a', 1);
         expect(cus.data.get('a')).toBe(1);
     });
+
     it('should handle setCustomComponentData message', () => {
         cus.communicator.fireMessage({
             type: 'setCustomComponentData',
@@ -64,9 +78,10 @@ describe('component [' + COMPONENT_NAME + ']', () => {
                     b: 1
                 }
             }]
-        })
+        });
         expect(cus.data.get('b')).toBe(1);
     });
+
     it('should handle customComponentInnerBehavior message', () => {
         cus.communicator.fireMessage({
             type: 'customComponentInnerBehavior',
@@ -75,36 +90,12 @@ describe('component [' + COMPONENT_NAME + ']', () => {
                 eventType: 'insertFormField'
             }
         });
-        const actual = typeof cus['insertFormField'];
+        const actual = typeof cus.insertFormField;
         const expected = 'function';
         expect(actual).toBe(expected);
     });
-    it('should handle triggerEvents message, its type is not object', () => {
-        const spy = sinon.spy(cus, 'fire');
-        cus.communicator.fireMessage({
-            type: 'triggerEvents',
-            nodeId: cusUid,
-            eventName: 'test',
-            eventData: '1'
-        });
-        expect(spy.calledOnceWith('bindtest', sinon.match.has('detail', '1'))).toBe(true);
-        spy.restore();
-    });
-    it('should handle triggerEvents message, its type is object', () => {
-        const spy = sinon.spy(cus, 'fire');
-        cus.communicator.fireMessage({
-            type: 'triggerEvents',
-            nodeId: cusUid,
-            eventName: 'test',
-            eventData: {
-                test: '1'
-            }
-        });
 
-        expect(spy.calledOnceWith('bindtest', sinon.match.has('test', '1'))).toBe(true);
-        spy.restore();
-    });
     afterAll(() => {
         testView.dispose();
-    })
+    });
 });

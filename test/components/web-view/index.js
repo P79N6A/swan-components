@@ -34,7 +34,6 @@ describe('component [' + COMPONENT_NAME + ']', () => {
     });
 
     it('should insert native component while first slaveRendered, update it while subsequent slaveUpdated', done => {
-
         const component3 = buildComponent(COMPONENT_NAME, WebView, {
             data: {
                 src: 'https://www.baidu.com'
@@ -53,7 +52,131 @@ describe('component [' + COMPONENT_NAME + ']', () => {
                 expect(update.calledOnce).toBe(true);
                 component3.dispose();
                 done();
-            })
-        })
+            });
+        });
+    });
+});
+
+describe('check api fail', () => {
+
+    it('should insert fail', done => {
+        const component = buildComponent(
+            COMPONENT_NAME,
+            WebView,
+            {
+                data: {
+                    src: 'https://www.baidu.com',
+                    unitTestParams: {
+                        apiExecResult: ['insertFail']
+                    }
+                }
+            }
+        );
+        const spy = sinon.spy(component, 'logStability');
+        const $component = attach2Document(component);
+        setTimeout(() => {
+            expect(spy.callCount).toBe(1);
+            spy.restore();
+            component.dispose();
+            done();
+        }, 1000);
+    });
+
+    it('should update fail', done => {
+        const component = buildComponent(
+            COMPONENT_NAME,
+            WebView,
+            {
+                data: {
+                    src: 'https://www.baidu.com',
+                    unitTestParams: {
+                        apiExecResult: ['updateFail']
+                    }
+                }
+            }
+        );
+        const spy = sinon.spy(component, 'logStability');
+        const $component = attach2Document(component);
+        component.nextTick(() => {
+            component.data.set('src', 'http://abc.com');
+            component.communicator.fireMessage({
+                type: 'slaveUpdated'
+            });
+        });
+        setTimeout(() => {
+            expect(spy.callCount).toBe(1);
+            spy.restore();
+            component.dispose();
+            done();
+        }, 1000);
+    });
+
+    it('should remove fail', done => {
+        const component = buildComponent(
+            COMPONENT_NAME,
+            WebView,
+            {
+                data: {
+                    src: 'https://www.baidu.com',
+                    unitTestParams: {
+                        apiExecResult: ['removeFail']
+                    }
+                }
+            }
+        );
+        const spy = sinon.spy(component, 'dispatch');
+        const $component = attach2Document(component);
+        component.nextTick(() => {
+            expect(spy.callCount).toBe(1);
+            component.dispose();
+            done();
+        });
+    });
+
+    it('should not update while no attr change', done => {
+        const component = buildComponent(
+            COMPONENT_NAME,
+            WebView,
+            {
+                data: {
+                    src: 'https://www.baidu.com'
+                }
+            }
+        );
+        const spy = sinon.spy(component.boxjs.webView, 'update');
+        const $component = attach2Document(component);
+        component.nextTick(() => {
+            component.data.set('src', 'https://www.baidu.com');
+            component.communicator.fireMessage({
+                type: 'slaveUpdated'
+            });
+            expect(spy.callCount).toBe(0);
+            component.dispose();
+            done();
+        });
+    });
+
+    it('should insert while not inserted', done => {
+        const component = buildComponent(
+            COMPONENT_NAME,
+            WebView,
+            {
+                data: {
+                    src: 'https://www.baidu.com'
+                }
+            }
+        );
+        const spy = sinon.spy(component.boxjs.webView, 'insert');
+        const $component = attach2Document(component);
+        component.args = {};
+        component.data.set('src', 'https://www.baidu.com');
+        component.communicator.fireMessage({
+            type: 'slaveUpdated'
+        });
+        component.nextTick(() => {
+            expect(spy.callCount).toBe(2);
+            component.dispose();
+            done();
+        });
     });
 });

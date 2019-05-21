@@ -6,6 +6,7 @@ import style from './index.css';
 import {isEqualObject, privateKey, COMPONENT_STATE} from '../utils';
 import {getElementBox} from '../utils/dom';
 import {internalDataComputedCreator, typesCast} from '../computedCreator';
+import {STABILITY_LOG_CONFIG} from '../utils/constant';
 
 let PLAYER_WIDTH = screen.height;
 let PLAYER_HEIGHT = screen.width;
@@ -142,7 +143,7 @@ export default {
      */
     attached() {
         // 接收客户端派发到slave的事件
-        this.communicator.onMessage(`video_${this.data.get('id')}`, event => {
+        this.communicator.onMessage(`video_${this.id}`, event => {
             this.dispatchNaEvent(event.params.action, event.params.e);
         });
 
@@ -217,6 +218,19 @@ export default {
     },
 
     /**
+     * 转为 file 协议的沙盒路径
+     *
+     * @param {string} path 原始路径
+     * @return {string} 原始路径/file 协议路径
+     */
+    fileProtocolResolve(path) {
+        if (path && !/^(http|https|bdfile|file):\/\/.*/i.test(path)) {
+            return `file://${this.absolutePathResolve(path)}`;
+        }
+        return path;
+    },
+
+    /**
      * 获得创建video所需的参数
      *
      * @return {Object}
@@ -241,23 +255,33 @@ export default {
             this.isFullscreenPositionChanged = false;
         }
         // 全屏
-        else {
-            if (!isEqualObject(this.verticalPosition, position)) {
-                this.isFullscreenPositionChanged = true;
-            }
+        else if (!isEqualObject(this.verticalPosition, position)) {
+            this.isFullscreenPositionChanged = true;
+        }
+
+        // iOS src 本地路径转为 file 协议
+        if (this.swaninterface.boxjs.platform.isIOS()
+            && !/^data:video\//.test(videoData.src)) {
+            videoData.src = this.fileProtocolResolve(videoData.src);
+        }
+
+        // poster 本地路径转为 file 协议
+        let poster = videoData.__poster;
+        if (!/^data:image\//.test(videoData.poster)) {
+            poster = this.fileProtocolResolve(videoData.poster);
         }
 
         return {
             gesture: this.hasGestrue(),
-            videoId: videoData.id,
-            viewId: videoData.id,
+            videoId: this.id,
+            viewId: this.id,
             sanId: this.id,
             parentId: this.getFirstParentComponentId(),
             src: videoData.src,
             initialTime: videoData.initialTime,
             duration: videoData.duration,
             objectFit: videoData.__objectFit,
-            poster: videoData.__poster,
+            poster,
             slaveId: `${this.slaveId}`,
             position,
             controls: videoData.__controls,
@@ -301,17 +325,18 @@ export default {
 
         this.isInserting = true;
         this.boxjs.media.video({
-            type: 'open',
+            type: 'insert',
             data: params
         }).then(e => {
             this.currentTime = null;
             this.isInserted = true;
             this.isInserting = false;
 
-            this.sendStateChangeMessage('video', COMPONENT_STATE.INSERT, this.args.videoId);
+            this.sendStateChangeMessage('video', COMPONENT_STATE.INSERT, this.data.get('id'), this.args.videoId);
         }).catch(err => {
             this.isInserting = false;
             console.warn('video open fail', err);
+            this.logStability(STABILITY_LOG_CONFIG.videoOpenError);
         });
     },
 
@@ -333,6 +358,7 @@ export default {
                 data: this.args
             }).catch(err => {
                 console.warn('video update fail', err);
+                this.logStability(STABILITY_LOG_CONFIG.videoUpdateError);
             });
         }
     },
@@ -350,7 +376,9 @@ export default {
                 slaveId: this.args.slaveId
             }
         }).then(res => {
-            this.sendStateChangeMessage('video', COMPONENT_STATE.REMOVE, this.args.videoId);
+            this.sendStateChangeMessage('video', COMPONENT_STATE.REMOVE, this.data.get('id'), this.args.videoId);
+        }).catch(err => {
+            this.logStability(STABILITY_LOG_CONFIG.videoRemoveError);
         });
     },
 
@@ -417,9 +445,12 @@ export default {
         else if (eventName === 'binddanmu') {
             data.text && (data.text = decodeURIComponent(data.text));
         }
+        else if (eventName === 'binderror') {
+            this.logStability(STABILITY_LOG_CONFIG.videoBindError);
+        }
 
         this.dispatchEvent(eventName, {
-            detail: data
+            detail: Object.assign(data, {videoId: this.data.get('id')})
         });
     }
 };

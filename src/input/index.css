@@ -20,6 +20,7 @@ swan-input .swan-input-main {
     width: 100%;
     height: 100%;
     position: relative;
+    font-size: inherit;
 }
 
 swan-input[disabled] {
@@ -37,11 +38,13 @@ swan-input .input-computed {
     overflow: hidden;
     text-overflow: inherit;
     white-space: nowrap;
+    font-size: inherit;
 }
 
 swan-input .input-placeholder {
     color: #ccc;
     flex: 1;
+    font-size: inherit;
 }
 
 swan-input .input-placeholder[showplaceholder="false"] {
